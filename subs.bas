@@ -9,7 +9,7 @@ declare sub init_terrain_line(	x as single, y as single, rds as single, _
 								a_l as single, coords as Terrain ptr)
 								
 declare sub update_ball (coords as ball_proto ptr)
-declare sub init_pl_positions(pl() as player_proto)
+declare sub init_pl_positions(pl() as player_proto, terrain_line() as terrain)
 declare sub draw_background(Terrain_line() as Terrain)
 declare sub draw_players(pl() as player_proto, pl_sel as integer)
 declare sub draw_ball(Ball as ball_proto)
@@ -18,9 +18,13 @@ declare sub draw_horz_scale	   (x as integer, y as integer, _
 								w as integer, h as integer, _
 								v as integer, mv as integer, _
 								s_color as Uinteger)
-declare sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto)
+declare sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr)
 declare sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
-				User_Mouse as mouse, Terrain_line() as Terrain)
+				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr)
+				
+declare sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer)
+
+declare function count_alive(pl() as player_proto, n_team as integer) as integer
 
 function get_diff_angle(alfa as single, beta as single) as single
     if alfa <> beta  then
@@ -71,42 +75,72 @@ sub update_players(pl() as player_proto)
 	for c = 0 to Ubound(pl)
 		if point(pl(c).x - pl(c).w\2, pl(c).y + pl(c).h + 3) = C_BLUE then
 			pl(c).y +=5
+			pl(c).speed *=0.9
 		end if
 		if pl(c).speed > 1 then
 			pl(c).x += pl(c).speed*cos(pl(c).rds)
 			pl(c).y += pl(c).speed*-sin(pl(c).rds)
 			pl(c).speed *= GRAVITY
+			'bound check
+			if pl(c).x + pl(c).w > SCR_W then
+				pl(c).x = SCR_W - pl(c).w - 10
+				pl(c).rds = -pl(c).rds
+			end if
+			if pl(c).x < 0 then
+				pl(c).x = 10
+				pl(c).rds = -pl(c).rds
+			end if
 		else
 			pl(c).speed = 0
 		end if
 	next c
 end sub
 
-sub init_pl_positions(pl() as player_proto)
+sub init_pl_positions(pl() as player_proto, Terrain_line() as Terrain)
 	dim c as integer
+	dim p as integer
 	for c = 0 to Ubound(pl)
-		pl(c).x = rnd * (SCR_W - 20) + 10
-		pl(c).y = 0
+		p = rnd * int(Ubound(Terrain_line)-2)+1
+		pl(c).x = Terrain_line(p).x
+		pl(c).y = Terrain_line(p).y - pl(c).h - 50
 		pl(c).team = c MOD 2
 		pl(c).w = 8
 		pl(c).h = 12 
-		pl(c).power = int(rnd*90)+10
+		pl(c).power = 99
 		pl(c).is_alive = true
 	next c
 end sub
 
 sub init_ground (Terrain_line() as Terrain)
 	dim c as integer
+	dim as single angle, length, sct_length
+	
+	sct_length = SECTION_W
+		
 	Terrain_line(0).x = -5
-	Terrain_line(0).y = SCR_H -100
+	Terrain_line(0).y = SCR_H \2
 
-	for c = 0 to Ubound(Terrain_line) 
+	for c = 0 to Ubound(Terrain_line)
+		'if c mod 20 = 0 then
+		angle = rnd *(PI*0.8)-PI*0.4
+		
+		length = sct_length / cos(angle)
+		
+		'top and bottom screen margin check, dont'allow the profile to
+		'go outside the specified area
+		if Terrain_line(c).y + sct_length * -sin(angle) < SCR_TOP_MARGIN then
+			angle = -angle
+		end if
+		if Terrain_line(c).y + sct_length * -sin(angle) > SCR_BOTTOM_MARGIN then
+			angle = -angle
+		end if
+		
 		if c < Ubound(Terrain_line) - 1 then
-		init_terrain_line(	Terrain_line(c).x, Terrain_line(c).y, rnd *(PI*0.33)-PI/8, _
-							SECTION_W, @Terrain_line(c+1))
+			init_terrain_line(	Terrain_line(c).x, Terrain_line(c).y, _
+								angle, length, @Terrain_line(c+1))
 		else
 			Terrain_line(SECTIONS-1).x = SCR_W
-			Terrain_line(SECTIONS-1).y = SCR_H \2
+			Terrain_line(SECTIONS-1).y = SCR_TOP_MARGIN
 		end if
 	next c
 end sub
@@ -128,6 +162,7 @@ end sub
 sub draw_players(pl() as player_proto, pl_sel as integer)
 	dim c as integer
 	for c = 0 to Ubound(pl)
+		if pl(c).is_alive = false then continue for
 		'draws a line around the selected player
 		if c = pl_sel then
 			line(pl(c).x - 2, pl(c).y -2 )-(pl(c).x + pl(c).w + 2, pl(c).y + pl(c).h + 2), &hFFFFFF, BF
@@ -135,7 +170,7 @@ sub draw_players(pl() as player_proto, pl_sel as integer)
 								20, 5, pl(c).power, 100, C_GRAY)
 			
 		end if
-		if c mod 2 then
+		if pl(c).team = 0 then
 			line(pl(c).x, pl(c).y)-(pl(c).x + pl(c).w, pl(c).y + pl(c).h), C_RED, BF
 		else
 			line(pl(c).x, pl(c).y)-(pl(c).x + pl(c).w, pl(c).y + pl(c).h), C_YELLOW, BF
@@ -154,7 +189,8 @@ sub draw_trajectory(pl() as player_proto, pl_sel as integer, User_Mouse as mouse
 	temp_rds = _abtp(pl(pl_sel).x, pl(pl_sel).y, _
 				User_Mouse.x, User_Mouse.y)
 	temp_speed = d_b_t_p(pl(pl_sel).x, pl(pl_sel).y, _
-				User_Mouse.x, User_Mouse.y)/5			
+				User_Mouse.x, User_Mouse.y)/5
+	if temp_speed > BALL_MAX_SPEED then temp_speed = BALL_MAX_SPEED		
 	temp_x = pl(pl_sel).x
 	temp_y = pl(pl_sel).y
 	'draw coords of the ball
@@ -185,18 +221,36 @@ sub draw_horz_scale	   (		x as integer, y as integer, _
 	line (x + 1,y + 1)-(x + bar_w, y + h), rgb(255 - int(bar_c*2.5),int(bar_c*2.5), 0), BF							
 end sub
 
-sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto)
+sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr)
+	dim c as integer
+	dim is_found as boolean = false
+
+	
 	'pl selected updated by user
 	User_Mouse.res = 	GetMouse( 	User_Mouse.x, User_Mouse.y, _
 									User_Mouse.wheel, User_Mouse.buttons,_
 									User_Mouse.clip)
 	User_Mouse.diff_wheel = User_Mouse.old_wheel - User_Mouse.wheel
 	User_Mouse.old_wheel = User_Mouse.wheel
-	*pl_sel = *pl_sel + User_Mouse.diff_wheel
-	if *pl_sel < 0 then *pl_sel = 0
-	if *pl_sel > Ubound(pl) then *pl_sel = Ubound(pl)
-
-	if Ball.is_active = false then
+	'select alive player
+	c = *pl_sel
+	if User_Mouse.diff_wheel then
+		while is_found = false
+			c += 2 * User_Mouse.diff_wheel
+			if c > Ubound(pl) then
+				c = 0 + *turn
+			end if
+			if c < 0 then
+				c = Ubound(pl) - 1 + *turn
+			end if
+			if pl(c).is_alive then
+				*pl_sel = c
+				is_found = true
+			end if
+		wend
+	end if
+	
+	if Ball.is_active = false and pl(*pl_sel).is_alive then
 		draw_trajectory(pl(), *pl_sel, User_Mouse)
 		'launch the ball
 		if User_Mouse.buttons = 1 then
@@ -204,15 +258,24 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 									User_Mouse.x, User_Mouse.y)
 			Ball.speed = d_b_t_p(	pl(*pl_sel).x, pl(*pl_sel).y, _
 									User_Mouse.x, User_Mouse.y) / 5
+									
+			if Ball.speed > BALL_MAX_SPEED then Ball.speed = BALL_MAX_SPEED
 			Ball.is_active = true
 			Ball.x = pl(*pl_sel).x
 			Ball.y = pl(*pl_sel).y - 5
+			*turn = 1-*turn
+			for c = *turn to Ubound(pl) step 2
+				if pl(c).is_alive then
+					*pl_sel = c
+					exit for
+				end if
+			next c
 		end if
 	end if
 end sub
 
 sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
-				User_Mouse as mouse, Terrain_line() as Terrain)
+				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr)
 	dim t as integer
 	t = get_nrst_node(@Ball, Terrain_line())
 	
@@ -223,16 +286,65 @@ sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
 	draw_arrow(Ball.x, Ball.y, _abtp(Ball.old_x, Ball.old_y, Ball.x, Ball.y), Ball.speed * 4, C_CYAN)
 	
 	draw string (20,20), str(hex(point(Ball.x, Ball.y)))
-	draw string (20,40), "Ball.x " + str(int(Ball.x))
-	draw string (20,60), "Ball.y " + str(int(Ball.y))
-	draw string (20,80), str(get_nrst_node(@Ball, Terrain_line()))
+	draw string (20,30), "Ball.x  " + str(int(Ball.x))
+	draw string (20,40), "Ball.y  " + str(int(Ball.y))
+	draw string (20,50), "Nrstnd  " + str(get_nrst_node(@Ball, Terrain_line()))
+	draw string (20,60), "turn    " + str(*Turn)
+	draw string (20,70), "Alive#0 " + str(count_alive(pl(), 0))
+	draw string (20,80), "Alive#1 " + str(count_alive(pl(), 1))
+	draw string (20,90), "SCT_W   " + str(SECTION_W)
 	
 	'player selected proprietes
-	draw string (pl(pl_sel).x, pl(pl_sel).y + 20), "PWR " + str(pl(pl_sel).power)
-	draw string (pl(pl_sel).x, pl(pl_sel).y + 30), "X   " + str(int(pl(pl_sel).x))
-	draw string (pl(pl_sel).x, pl(pl_sel).y + 40), "Y   " + str(int(pl(pl_sel).y))
-	draw string (pl(pl_sel).x, pl(pl_sel).y + 50), "ID  " + str(pl_sel)
+	draw string (pl(pl_sel).x, pl(pl_sel).y + 20), " PWR " + str(pl(pl_sel).power)
+	draw string (pl(pl_sel).x, pl(pl_sel).y + 30), "   X " + str(int(pl(pl_sel).x))
+	draw string (pl(pl_sel).x, pl(pl_sel).y + 40), "   Y " + str(int(pl(pl_sel).y))
+	draw string (pl(pl_sel).x, pl(pl_sel).y + 50), "  ID " + str(pl_sel)
+	draw string (pl(pl_sel).x, pl(pl_sel).y + 60), "TEAM " + str(pl(pl_sel).team)
+	
+	line (0,SCR_TOP_MARGIN)-(SCR_W, SCR_TOP_MARGIN), C_GRAY
+	line (0,SCR_BOTTOM_MARGIN)-(SCR_W, SCR_BOTTOM_MARGIN), C_GRAY
 end sub
+
+sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer)
+	dim as integer c, x, y, w, h, p, m, mb
+	w = 20 'width
+	h = 30 'heigth
+	p = 2 'padding
+	m = 10 'margin left/right
+	mb = 40 'margin bottom
+	
+	for c = 0 to Ubound(pl)
+		if pl(c).is_alive then
+			if pl(c).team = 0 then
+				x = m+(w*c)+(p*c)
+				y = SCR_H - mb
+				'highlight selected player
+				if c = pl_sel then line(x-2,y+2)-(x+w+2, y-h-2), C_WHITE,B
+				line(x,y)-(x+w, y-h), C_RED,BF
+				draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
+			else
+				x = SCR_W - m -(w*c)-(p*c)
+				y = SCR_H - mb
+				'highlight selected player
+				if c = pl_sel then line(x-2,y+2)-(x+w+2, y-h-2), C_WHITE,B
+				line(x,y)-(x+w, y-h), C_YELLOW,BF
+				draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
+			end if
+		end if
+	next c
+
+end sub
+
+function count_alive(pl() as player_proto, n_team as integer) as integer
+	dim c as integer
+	dim alive_players as integer = 0
+	for c = 0 to Ubound(pl)
+		if pl(c).team = n_team then
+			if pl(c).is_alive then alive_players +=1
+		end if
+	next c
+	return alive_players
+end function
 
 
 

@@ -19,18 +19,22 @@ Randomize Timer()
 'initialize Types
 Dim Terrain_line(0 to SECTIONS-1) as Terrain
 Dim Ball as ball_proto
+Dim Ball_Record(0 to 20) as ball_proto
+
 Dim pl(0 to 9) as player_proto
 Dim User_Mouse as mouse
 dim pl_sel as integer = 0
+Dim turn as integer = 0
 
 DIM SHARED Workpage AS INTEGER 
 
 dim c as integer
 
-'init pl positions
-init_pl_positions(pl())
 ' INITIALIZE GROUND PROFILE
 init_ground(Terrain_line())
+
+'init pl positions
+init_pl_positions(pl(), Terrain_line())
 
 screenres SCR_W, SCR_H, 24
 dim e As EVENT
@@ -66,10 +70,14 @@ DO
 			Terrain_line(t-1).y -= -sin(Ball.rds) * (Ball.speed + GRAVITY_ACCEL) * 0.2
 			'check collision of the ball with each player
 			for c = 0 to Ubound(pl)
+				'skip the players without power
+				if pl(c).is_alive = false then continue for
 				if (d_b_t_p(Ball.x, Ball.y,pl(c).x, pl(c).y) < 30) then
-					pl(c).power -= int(rnd*10+10)
-					pl(c).speed = rnd*5 + 5
-					pl(c).rds = rnd*1 + 1
+					'the player hitted lose some power
+					pl(c).power -= int(30 - d_b_t_p(Ball.x, Ball.y,pl(c).x, pl(c).y))
+					if pl(c).power < 1 then pl(c).is_alive = false
+					pl(c).speed = rnd*4 + 4
+					pl(c).rds = PI/2 + rnd(PI/4) - PI/8
 					pl(c).y +=10
 				end if
 			next c
@@ -80,12 +88,13 @@ DO
 	end if
 	
 	'get user input
-	get_mouse (Ball, User_Mouse, @pl_sel, pl())
+	get_mouse (Ball, User_Mouse, @pl_sel, pl(), @turn)
 	
 	'draw players
 	draw_players(pl(), pl_sel)
 	draw_ball(Ball)
-	draw_debug (Ball, pl(), pl_sel, User_Mouse, Terrain_line())
+	draw_player_stats (pl(), pl_sel, turn)
+	draw_debug (Ball, pl(), pl_sel, User_Mouse, Terrain_line(), @turn)
 	
 	workpage xor = 1 ' Swap work pages.
 	screensync
