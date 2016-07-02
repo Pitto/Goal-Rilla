@@ -11,20 +11,26 @@ declare sub init_terrain_line(	x as single, y as single, rds as single, _
 declare sub update_ball (coords as ball_proto ptr)
 declare sub init_pl_positions(pl() as player_proto, terrain_line() as terrain)
 declare sub draw_background(Terrain_line() as Terrain)
-declare sub draw_players(pl() as player_proto, pl_sel as integer)
-declare sub draw_ball(Ball as ball_proto)
+declare sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sprite_t0() as Uinteger ptr, sprite_t1() as Uinteger ptr)
+declare sub draw_ball(Ball as ball_proto, ball_sprite() as Uinteger ptr)
 declare sub draw_trajectory(pl() as player_proto, pl_sel as integer, User_Mouse as mouse)
+'draws a bar scale
 declare sub draw_horz_scale	   (x as integer, y as integer, _
 								w as integer, h as integer, _
 								v as integer, mv as integer, _
 								s_color as Uinteger)
 declare sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr)
+'prints on screen useful info for debug
 declare sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
 				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr)
 				
 declare sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer)
 
+declare sub load_bmp ( bmp() as Uinteger ptr, w as integer, h as integer, _
+					   cols as integer, rows as integer, Byref bmp_path as string)
+
 declare function count_alive(pl() as player_proto, n_team as integer) as integer
+declare function start_frame (rds as single) as integer
 
 function get_diff_angle(alfa as single, beta as single) as single
     if alfa <> beta  then
@@ -73,6 +79,8 @@ end function
 sub update_players(pl() as player_proto)
 	dim c as integer
 	for c = 0 to Ubound(pl)
+		pl(c).old_x = pl(c).x
+		pl(c).old_y = pl(c).y
 		if point(pl(c).x - pl(c).w\2, pl(c).y + pl(c).h + 3) = C_BLUE then
 			pl(c).y +=5
 			pl(c).speed *=0.9
@@ -159,28 +167,73 @@ sub draw_background(Terrain_line() as Terrain)
 	paint (SCR_W \ 2, 2), C_BLUE, &hFF0000
 end sub
 
-sub draw_players(pl() as player_proto, pl_sel as integer)
+sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sprite_t0() as Uinteger ptr, sprite_t1() as Uinteger ptr)
 	dim c as integer
+	dim sprite as integer
 	for c = 0 to Ubound(pl)
 		if pl(c).is_alive = false then continue for
 		'draws a line around the selected player
 		if c = pl_sel then
-			line(pl(c).x - 2, pl(c).y -2 )-(pl(c).x + pl(c).w + 2, pl(c).y + pl(c).h + 2), &hFFFFFF, BF
-			draw_horz_scale	   (pl(c).x - pl(c).w\2, pl(c).y + pl(c).h + 10, _
+	
+			draw_horz_scale	   (pl(c).x - pl(c).w\2 - 2, pl(c).y + pl(c).h + 10, _
 								20, 5, pl(c).power, 100, C_GRAY)
 			
 		end if
+		
+		sprite = start_frame (_abtp (ball.x, ball.y, pl(c).x,pl(c).y ))
 		if pl(c).team = 0 then
-			line(pl(c).x, pl(c).y)-(pl(c).x + pl(c).w, pl(c).y + pl(c).h), C_RED, BF
+			if pl(c).speed then
+				sprite = start_frame (_abtp (pl(c).x,pl(c).y, pl(c).old_x,pl(c).old_y )) + 1
+			end if
+			
+			put (pl(c).x - 10, pl(c).y - 5), sprite_t0(sprite), trans
 		else
-			line(pl(c).x, pl(c).y)-(pl(c).x + pl(c).w, pl(c).y + pl(c).h), C_YELLOW, BF
+			if pl(c).speed then
+				sprite = start_frame (_abtp (pl(c).x,pl(c).y, pl(c).old_x,pl(c).old_y )) + 1
+			end if
+	
+			put (pl(c).x - 10, pl(c).y - 5), sprite_t1(sprite), trans
+		end if
+		
+	next c
+end sub
+
+sub draw_ball(Ball as ball_proto, ball_sprite() as Uinteger ptr)
+	if Ball.is_active then
+		put (Ball.x - 8, Ball.y - 8), ball_sprite(int((timer * 10) mod Ubound(ball_sprite))), trans
+	end if
+end sub
+
+
+sub update_particles(particles() as ball_proto)
+	dim c as integer
+	for c = 0 to ubound(particles)
+		'check screen bounds
+		if 	particles(c).x > 0 and particles(c).x < SCR_W _
+			and particles(c).y > 0 and particles(c).y < SCR_H then
+			particles(c).x += particles(c).speed * cos(particles(c).rds)
+			particles(c).y += particles(c).speed * -sin(particles(c).rds) + GRAVITY_ACCEL
+			particles(c).speed *= GRAVITY
 		end if
 	next c
 end sub
 
-sub draw_ball(Ball as ball_proto)
-	Circle (Ball.x, Ball.y), 5, C_RED,,,,F
-	Circle (Ball.x, Ball.y), 3, C_DARK_RED,,,,F
+sub draw_particles(particles() as ball_proto)
+	dim c as integer
+	for c = 0 to ubound(particles)
+		Circle (particles(c).x, particles(c).y), particles(c).w, C_YELLOW,,,,F
+	next c
+end sub
+
+sub init_particles(x as integer, y as integer, particles() as ball_proto)
+	dim c as integer
+	for c = 0 to ubound(particles)
+		particles(c).x = x
+		particles(c).y = y
+		particles(c).speed = rnd*6 + 10
+		particles(c).w = int (rnd*3) + 1
+		particles(c).rds = PI/2 + rnd(PI/4) - PI/8
+	next c
 end sub
 
 sub draw_trajectory(pl() as player_proto, pl_sel as integer, User_Mouse as mouse)
@@ -188,6 +241,7 @@ sub draw_trajectory(pl() as player_proto, pl_sel as integer, User_Mouse as mouse
 	dim c as integer 
 	temp_rds = _abtp(pl(pl_sel).x, pl(pl_sel).y, _
 				User_Mouse.x, User_Mouse.y)
+				
 	temp_speed = d_b_t_p(pl(pl_sel).x, pl(pl_sel).y, _
 				User_Mouse.x, User_Mouse.y)/5
 	if temp_speed > BALL_MAX_SPEED then temp_speed = BALL_MAX_SPEED		
@@ -230,10 +284,17 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 	User_Mouse.res = 	GetMouse( 	User_Mouse.x, User_Mouse.y, _
 									User_Mouse.wheel, User_Mouse.buttons,_
 									User_Mouse.clip)
-	User_Mouse.diff_wheel = User_Mouse.old_wheel - User_Mouse.wheel
-	User_Mouse.old_wheel = User_Mouse.wheel
+	'check if the mouse isnt' outside the window 
+	if  User_Mouse.clip <> -1 then
+		User_Mouse.diff_wheel = User_Mouse.old_wheel - User_Mouse.wheel
+		if User_Mouse.diff_wheel > 1 then User_Mouse.diff_wheel = 1
+		if User_Mouse.diff_wheel < -1 then User_Mouse.diff_wheel = -1
+		User_Mouse.old_wheel = User_Mouse.wheel
+	end if
 	'select alive player
 	c = *pl_sel
+
+	'check if user has moved the mouse's wheel
 	if User_Mouse.diff_wheel then
 		while is_found = false
 			c += 2 * User_Mouse.diff_wheel
@@ -256,6 +317,7 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 		if User_Mouse.buttons = 1 then
 			Ball.rds = 	_abtp(		pl(*pl_sel).x, pl(*pl_sel).y, _
 									User_Mouse.x, User_Mouse.y)
+			
 			Ball.speed = d_b_t_p(	pl(*pl_sel).x, pl(*pl_sel).y, _
 									User_Mouse.x, User_Mouse.y) / 5
 									
@@ -263,6 +325,8 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 			Ball.is_active = true
 			Ball.x = pl(*pl_sel).x
 			Ball.y = pl(*pl_sel).y - 5
+			'after kicking the ball change the team turn
+			'find first opponent player alive
 			*turn = 1-*turn
 			for c = *turn to Ubound(pl) step 2
 				if pl(c).is_alive then
@@ -293,6 +357,13 @@ sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
 	draw string (20,70), "Alive#0 " + str(count_alive(pl(), 0))
 	draw string (20,80), "Alive#1 " + str(count_alive(pl(), 1))
 	draw string (20,90), "SCT_W   " + str(SECTION_W)
+	draw string (20,100),"Mouse x          " + str(User_Mouse.x)
+	draw string (20,110),"Mouse y          " + str(User_Mouse.y)
+	draw string (20,120),"Mouse.wheel      " + str(User_Mouse.wheel)
+	draw string (20,130),"Mouse.buttons    " + str(User_Mouse.buttons)
+	draw string (20,140),"Mouse.clip       " + str(User_Mouse.clip)
+	draw string (20,150),"Mouse.diff_wheel " + str(User_Mouse.diff_wheel)
+	draw string (20,160),"Mouse.old_wheel  " + str(User_Mouse.old_wheel)
 	
 	'player selected proprietes
 	draw string (pl(pl_sel).x, pl(pl_sel).y + 20), " PWR " + str(pl(pl_sel).power)
@@ -344,6 +415,61 @@ function count_alive(pl() as player_proto, n_team as integer) as integer
 		end if
 	next c
 	return alive_players
+end function
+
+sub load_bmp ( 	bmp() as Uinteger ptr, w as integer, h as integer, _
+				cols as integer, rows as integer, Byref bmp_path as string)
+				
+	dim as integer c, tiles, tile_w, tile_h, y, x
+	tiles = cols * rows
+	tile_w = w\cols
+	tile_h = h\rows
+	y = 0
+	x = 0
+	
+	BLOAD bmp_path, 0
+	
+	for c = 0 to Ubound(bmp)
+		if c > 0 and c mod cols = 0 then
+			y+= tile_h 
+			x = 0 
+		end if
+		bmp(c) = IMAGECREATE (tile_w, tile_h)
+		GET (x, y)-(x + tile_w - 1, y + tile_h - 1), bmp(c)
+		x += tile_w
+
+	next c
+
+end sub
+
+
+function start_frame (rds as single) as integer
+    
+    dim degree as integer
+    'convert radiants to 360° degree
+    degree = (180-int(rds*180/PI))
+    select case degree
+		case 0 to 22
+			return 0
+		case 23 to 67
+			return 28'tr
+		case 68 to 112
+			return 24
+		case 113 to 157
+			return 20
+		case 158 to 202
+			return 16
+		case 203 to 247
+			return 12'bL
+		case 248 to 292
+			return 8
+		case 292 to 337
+			return 4
+		case 337 to 360
+			return 0
+		case else
+			return 0
+    end select
 end function
 
 

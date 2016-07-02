@@ -1,8 +1,8 @@
-#define GAME_NAME GOALRILLA
-#define GAME_VERSION 			0.01
+#define GAME_NAME "GOALRILLA"
+#define GAME_VERSION 			0.04
 #define SCR_W 					640
 #define SCR_H 					480
-#define SECTIONS 				32
+#define SECTIONS 				64
 #define TERRAIN_WIDTH 			SCR_W
 #define SECTION_W 				TERRAIN_WIDTH \ SECTIONS
 #define SCR_TOP_MARGIN 			100
@@ -30,6 +30,6 @@ const GRAVITY 		as single 	= 0.980665f
 'friction of the air
 const AIR_FRICTION 	as single = 0.995
 'maximum speed the ball can reach so it doesn't become a ball flame
-const BALL_MAX_SPEED as single = 20.0f 
+const BALL_MAX_SPEED as single = 25.0f 
 'minimum speed of the ball
 const BALL_MIN_SPEED as Single 	= 0.01f 

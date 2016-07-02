@@ -12,11 +12,14 @@ type ball_proto
 	rds 	as single 'angle in radiants
 	speed 	as single
 	is_active as boolean
+	w as single
 end type
 
 type player_proto
 	x as single
 	y as single
+	old_x 	as single
+	old_y 	as single
 	w as single
 	h as single
 	rds as single
