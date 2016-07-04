@@ -24,7 +24,7 @@ declare sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as intege
 declare sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
 				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr)
 				
-declare sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer)
+declare sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer, status_sprite() as Uinteger ptr)
 
 declare sub load_bmp ( bmp() as Uinteger ptr, w as integer, h as integer, _
 					   cols as integer, rows as integer, Byref bmp_path as string)
@@ -376,32 +376,41 @@ sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
 	line (0,SCR_BOTTOM_MARGIN)-(SCR_W, SCR_BOTTOM_MARGIN), C_GRAY
 end sub
 
-sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer)
+sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer, status_sprite() as Uinteger ptr)
 	dim as integer c, x, y, w, h, p, m, mb
-	w = 20 'width
-	h = 30 'heigth
+	w = 26 'width
+	h = 32 'heigth
 	p = 2 'padding
 	m = 10 'margin left/right
 	mb = 40 'margin bottom
 	
 	for c = 0 to Ubound(pl)
-		if pl(c).is_alive then
+	
 			if pl(c).team = 0 then
 				x = m+(w*c)+(p*c)
 				y = SCR_H - mb
 				'highlight selected player
-				if c = pl_sel then line(x-2,y+2)-(x+w+2, y-h-2), C_WHITE,B
-				line(x,y)-(x+w, y-h), C_RED,BF
+				if c = pl_sel then line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,B
+				'line(x,y)-(x+w, y-h), C_RED,BF
+				if pl(c).is_alive then
+					put (x, y), status_sprite(1),trans
+				else
+					put (x, y), status_sprite(2),trans
+				end if
 				draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
 			else
 				x = SCR_W - m -(w*c)-(p*c)
 				y = SCR_H - mb
 				'highlight selected player
-				if c = pl_sel then line(x-2,y+2)-(x+w+2, y-h-2), C_WHITE,B
-				line(x,y)-(x+w, y-h), C_YELLOW,BF
+				if c = pl_sel then line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,B
+				if pl(c).is_alive then
+					put (x, y), status_sprite(0),trans
+				else
+					put (x, y), status_sprite(2),trans
+				end if
 				draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
 			end if
-		end if
+	
 	next c
 
 end sub
@@ -471,6 +480,35 @@ function start_frame (rds as single) as integer
 			return 0
     end select
 end function
+
+function get_terrain_tile (tile as integer, margin as integer) as integer
+
+dim as integer c, p, masked, tile_x, tile_y
+
+dim tile_model(0 to 15) as integer = {	&b0000, &b1000, &b1100, &b1110, _
+										&b1111, &b0111, &b0011, &b0001, _
+										&b0101, &b1010, &b1101, &b1011, _
+										&b0110, &b1001, &b0010, &b0100}
+
+tile_x = (tile mod BMP_TILE_COLS) * BMP_TILE_W
+tile_y = (tile \ BMP_TILE_COLS) * BMP_TILE_H
+
+masked = &b0000
+
+if point(tile_x + margin, tile_y + margin) <> C_BLUE then masked = masked or &b1000
+if point(tile_x + BMP_TILE_W - margin, tile_y + margin) <> C_BLUE then masked = masked or &b0100
+if point(tile_x + margin, tile_y + BMP_TILE_H - margin) <> C_BLUE then masked = masked or &b0010
+if point(tile_x + BMP_TILE_W - margin, tile_y + BMP_TILE_H - margin) <> C_BLUE then masked = masked or &b0001
+
+for c = 0 to Ubound (tile_model)
+	if tile_model(c) = masked then exit for
+next c
+
+return c
+
+end function
+
+
 
 
 
