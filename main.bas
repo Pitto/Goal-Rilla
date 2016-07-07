@@ -67,7 +67,10 @@ DO
 		case splashscreen
 			if Multikey(SC_ENTER) then game_section = terrain_generation
 			draw string (20,20), GAME_NAME + " " + str(GAME_VERSION)
-			draw string (20,30), "Press Enter to start"
+			draw string (20,40), "Use mouse wheel to change selected player", C_GRAY
+			draw string (20,50), "Right click to move player", C_GRAY
+			draw string (20,60), "Left click to kick ball", C_GRAY
+			draw string (20,SCR_H - 50 + 50 * cos(Timer * 2)), "Press Enter to start", C_RED
 		case terrain_generation
 			' INITIALIZE GROUND PROFILE
 			init_ground(Terrain_line())
@@ -76,12 +79,7 @@ DO
 			game_section = game
 		case game
 			draw_background(Terrain_line())
-			
 
-			
-			
-			
-			
 			dim t as integer
 			t = get_nrst_node(@Ball, Terrain_line())
 			
@@ -93,7 +91,11 @@ DO
 				if Ball.is_active then
 					'modify the ground profile
 					Terrain_line(t).y += 16
-				
+					if t < Ubound(Terrain_line) and t > 0 then
+						terrain_line(t-1).y +=8
+						terrain_line(t+1).y +=8
+					end if
+						
 					init_particles(Ball.x, Ball.y, particles())
 					'check collision of the ball with each player
 					for c = 0 to Ubound(pl)
@@ -103,7 +105,7 @@ DO
 							'the player hitted lose some power
 							pl(c).power -= int(60 - d_b_t_p(Ball.x, Ball.y,pl(c).x, pl(c).y))
 							if pl(c).power < 1 then pl(c).is_alive = false
-							pl(c).speed = rnd*5 + 12
+							pl(c).speed = rnd*5 + 5
 							pl(c).rds = PI/2 + rnd(PI/4) - PI/8
 							pl(c).y +=10
 						end if
@@ -116,10 +118,13 @@ DO
 			
 			'get user input
 			get_mouse (Ball, User_Mouse, @pl_sel, pl(), @turn)
+			
+			'draws terrain sprite overlayed
 			for c = 0 to BMP_TILE_TOT - 1
 				put ((c mod BMP_TILE_COLS) * BMP_TILE_W, _
 					(c \ BMP_TILE_COLS) * BMP_TILE_H), terrain_sprite(4), and
 			next c
+			'-------
 			
 			draw_particles(particles())
 			'draw players
@@ -127,7 +132,6 @@ DO
 			draw_ball(Ball, Ball_sprite())
 			draw_player_stats (pl(), pl_sel, turn, status_sprite())
 			
-		
 			'draw debug info by pressing run-time D Key
 			if (Debug_mode) then
 				draw_debug (Ball, pl(), pl_sel, User_Mouse, Terrain_line(), @turn)
@@ -145,3 +149,16 @@ for c = 0 to Ubound(pl_sprite_0)
 	ImageDestroy pl_sprite_0(c)
 	ImageDestroy pl_sprite_1(c)
 next c
+
+for c = 0 to Ubound(Ball_sprite)
+	ImageDestroy Ball_sprite(c)
+next c
+
+for c = 0 to Ubound(status_sprite)
+	ImageDestroy status_sprite(c)
+next c
+
+for c = 0 to Ubound(terrain_sprite)
+	ImageDestroy terrain_sprite(c)
+next c
+

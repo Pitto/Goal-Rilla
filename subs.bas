@@ -82,8 +82,8 @@ sub update_players(pl() as player_proto)
 		pl(c).old_x = pl(c).x
 		pl(c).old_y = pl(c).y
 		if point(pl(c).x - pl(c).w\2, pl(c).y + pl(c).h + 3) = C_BLUE then
-			pl(c).y +=5
-			pl(c).speed *=0.9
+			pl(c).y +=2
+			pl(c).speed *= GRAVITY
 		end if
 		if pl(c).speed > 1 then
 			pl(c).x += pl(c).speed*cos(pl(c).rds)
@@ -116,6 +116,7 @@ sub init_pl_positions(pl() as player_proto, Terrain_line() as Terrain)
 		pl(c).h = 12 
 		pl(c).power = 99
 		pl(c).is_alive = true
+		pl(c).has_moved = false
 	next c
 end sub
 
@@ -247,7 +248,7 @@ sub draw_trajectory(pl() as player_proto, pl_sel as integer, User_Mouse as mouse
 	dim c as integer 
 	temp_rds = _abtp(pl(pl_sel).x, pl(pl_sel).y, _
 				User_Mouse.x, User_Mouse.y)
-				
+
 	temp_speed = d_b_t_p(pl(pl_sel).x, pl(pl_sel).y, _
 				User_Mouse.x, User_Mouse.y)/5
 	if temp_speed > BALL_MAX_SPEED then temp_speed = BALL_MAX_SPEED		
@@ -319,14 +320,22 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 	
 	if Ball.is_active = false and pl(*pl_sel).is_alive then
 		draw_trajectory(pl(), *pl_sel, User_Mouse)
+		'move the player
+		if CBool(User_Mouse.buttons = 2) and pl(*pl_sel).has_moved = false then
+			pl(*pl_sel).speed = PL_MOVING_SPEED
+			pl(*pl_sel).y -= 20
+			pl(*pl_sel).rds = abs(_abtp(pl(*pl_sel).x, pl(*pl_sel).y, _
+									User_Mouse.x, User_Mouse.y))
+			pl(*pl_sel).has_moved = true
+		end if
 		'launch the ball
 		if User_Mouse.buttons = 1 then
 			Ball.rds = 	_abtp(		pl(*pl_sel).x, pl(*pl_sel).y, _
 									User_Mouse.x, User_Mouse.y)
-			
+									
 			Ball.speed = d_b_t_p(	pl(*pl_sel).x, pl(*pl_sel).y, _
 									User_Mouse.x, User_Mouse.y) / 5
-									
+			'dont' allow the ball to go to fast					
 			if Ball.speed > BALL_MAX_SPEED then Ball.speed = BALL_MAX_SPEED
 			Ball.is_active = true
 			Ball.x = pl(*pl_sel).x
@@ -334,6 +343,11 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 			'after kicking the ball change the team turn
 			'find first opponent player alive
 			*turn = 1-*turn
+			'reset has_moved status - allows all players to move again
+			for c = 0 to Ubound(pl)
+				pl(c).has_moved = false
+			next c
+			
 			for c = *turn to Ubound(pl) step 2
 				if pl(c).is_alive then
 					*pl_sel = c
@@ -391,32 +405,30 @@ sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer,
 	mb = 40 'margin bottom
 	
 	for c = 0 to Ubound(pl)
-	
-			if pl(c).team = 0 then
-				x = m+(w*c)+(p*c)
-				y = SCR_H - mb
-				'highlight selected player
-				if c = pl_sel then line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,B
-				'line(x,y)-(x+w, y-h), C_RED,BF
-				if pl(c).is_alive then
-					put (x, y), status_sprite(1),trans
-				else
-					put (x, y), status_sprite(2),trans
-				end if
-				draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
+		if pl(c).team = 0 then
+			x = m+(w*c)+(p*c)
+			y = SCR_H - mb
+			'highlight selected player
+			if c = pl_sel then line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,BF
+			'line(x,y)-(x+w, y-h), C_RED,BF
+			if pl(c).is_alive then
+				put (x, y), status_sprite(1),trans
 			else
-				x = SCR_W - m -(w*c)-(p*c)
-				y = SCR_H - mb
-				'highlight selected player
-				if c = pl_sel then line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,B
-				if pl(c).is_alive then
-					put (x, y), status_sprite(0),trans
-				else
-					put (x, y), status_sprite(2),trans
-				end if
-				draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
+				put (x, y), status_sprite(2),trans
 			end if
-	
+			draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
+		else
+			x = SCR_W - m -(w*c)-(p*c)
+			y = SCR_H - mb
+			'highlight selected player
+			if c = pl_sel then line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,B
+			if pl(c).is_alive then
+				put (x, y), status_sprite(0),trans
+			else
+				put (x, y), status_sprite(2),trans
+			end if
+			draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
+		end if
 	next c
 
 end sub

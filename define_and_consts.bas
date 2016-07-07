@@ -1,5 +1,5 @@
 #define GAME_NAME "GOALRILLA"
-#define GAME_VERSION 			0.05
+#define GAME_VERSION 			0.06
 #define SCR_W 					640
 #define SCR_H 					480
 #define SECTIONS 				80
@@ -38,4 +38,9 @@ const AIR_FRICTION 	as single = 0.995
 'maximum speed the ball can reach so it doesn't become a ball flame
 const BALL_MAX_SPEED as single = 25.0f 
 'minimum speed of the ball
-const BALL_MIN_SPEED as Single 	= 0.01f 
+const BALL_MIN_SPEED as Single 	= 0.01f
+'player moving speed
+const PL_MOVING_SPEED as integer = 5
+
+
+

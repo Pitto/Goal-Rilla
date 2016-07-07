@@ -27,6 +27,7 @@ type player_proto
 	power as single
 	team as integer
 	is_alive as boolean
+	has_moved as boolean
 end type
 
 Type mouse
