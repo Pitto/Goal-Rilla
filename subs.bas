@@ -155,16 +155,22 @@ end sub
 
 sub draw_background(Terrain_line() as Terrain)
 	dim c as integer
+	
 	'draw the ground line
 	for c = 0 to Ubound(Terrain_line)
 		if c < Ubound(Terrain_line) - 1 then
-			line (Terrain_line(c).x, Terrain_line(c).y)-(Terrain_line(c +1).x, Terrain_line(c+1).y), &hFF0000
+			line (Terrain_line(c).x, Terrain_line(c).y)-(Terrain_line(c +1).x, Terrain_line(c+1).y), C_BLUE
+			line (Terrain_line(c).x, Terrain_line(c).y +20)-(Terrain_line(c +1).x, Terrain_line(c+1).y + 20), C_BLUE
+			line (Terrain_line(c).x, Terrain_line(c).y +20)-(Terrain_line(c).x, Terrain_line(c).y), C_BLUE
 		else
-			line (Terrain_line(c-1).x, Terrain_line(c-1).y)-(Terrain_line(c).x, Terrain_line(c).y), &hFF0000
+			line (Terrain_line(c-1).x, Terrain_line(c-1).y)-(Terrain_line(c).x, Terrain_line(c).y), C_BLUE
+			line (Terrain_line(c-1).x, Terrain_line(c-1).y +20)-(Terrain_line(c).x, Terrain_line(c).y +20 ), C_BLUE
+
 		end if
 	next c
 	' fill the background
-	paint (SCR_W \ 2, 2), C_BLUE, &hFF0000
+	paint (SCR_W \ 2, 2), C_BLUE, C_BLUE
+	paint (SCR_W \ 2, SCR_H - 2), C_DARK_GREEN, C_BLUE
 end sub
 
 sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sprite_t0() as Uinteger ptr, sprite_t1() as Uinteger ptr)
@@ -381,7 +387,7 @@ sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer,
 	w = 26 'width
 	h = 32 'heigth
 	p = 2 'padding
-	m = 10 'margin left/right
+	m = 5 'margin left/right
 	mb = 40 'margin bottom
 	
 	for c = 0 to Ubound(pl)

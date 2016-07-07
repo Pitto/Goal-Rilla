@@ -2,7 +2,7 @@
 #define GAME_VERSION 			0.05
 #define SCR_W 					640
 #define SCR_H 					480
-#define SECTIONS 				32
+#define SECTIONS 				80
 #define TERRAIN_WIDTH 			SCR_W
 #define SECTION_W 				TERRAIN_WIDTH \ SECTIONS
 #define SCR_TOP_MARGIN 			100

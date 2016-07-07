@@ -22,7 +22,7 @@ Dim Terrain_line(0 to SECTIONS-1) 	as Terrain
 Dim Ball 							as ball_proto
 dim particles(0 to 9) 				as ball_proto
 Dim Ball_Record(0 to 20) 			as ball_proto
-Dim pl(0 to 9) 						as player_proto
+Dim pl(0 to 9)	 					as player_proto
 Dim User_Mouse 						as mouse
 dim pl_sel 							as integer = 0
 Dim turn 							as integer = 0
@@ -77,25 +77,7 @@ DO
 		case game
 			draw_background(Terrain_line())
 			
-			'for c = 0 to BMP_TILE_TOT - 1
-	
-				'draw string ((c mod BMP_TILE_COLS) * BMP_TILE_W, _
-				'			(c \ BMP_TILE_COLS) * BMP_TILE_H + 10), _
-				'			str(get_terrain_tile (c, 5))
-							
-				'draw string ((c mod BMP_TILE_COLS) * BMP_TILE_W, _
-				'			(c \ BMP_TILE_COLS) * BMP_TILE_H), _
-				'			str (c)
-							
-				'put ((c mod BMP_TILE_COLS) * BMP_TILE_W, _
-				'			(c \ BMP_TILE_COLS) * BMP_TILE_H), terrain_sprite(get_terrain_tile (c, 5)), trans
-							
-			
-				'line (		(c mod BMP_TILE_COLS) * BMP_TILE_W, _
-				'			(c \ BMP_TILE_COLS) * BMP_TILE_H)- _
-				'			((c mod BMP_TILE_COLS) * BMP_TILE_W + BMP_TILE_W, _
-				'			(c \ BMP_TILE_COLS) * BMP_TILE_H + BMP_TILE_H ), C_BLACK, B
-			'next c
+
 			
 			
 			
@@ -134,8 +116,10 @@ DO
 			
 			'get user input
 			get_mouse (Ball, User_Mouse, @pl_sel, pl(), @turn)
-			
-			
+			for c = 0 to BMP_TILE_TOT - 1
+				put ((c mod BMP_TILE_COLS) * BMP_TILE_W, _
+					(c \ BMP_TILE_COLS) * BMP_TILE_H), terrain_sprite(4), and
+			next c
 			
 			draw_particles(particles())
 			'draw players
@@ -143,13 +127,10 @@ DO
 			draw_ball(Ball, Ball_sprite())
 			draw_player_stats (pl(), pl_sel, turn, status_sprite())
 			
-
-			
+		
 			'draw debug info by pressing run-time D Key
 			if (Debug_mode) then
 				draw_debug (Ball, pl(), pl_sel, User_Mouse, Terrain_line(), @turn)
-				
-
 			end if
 	
 	end select
