@@ -19,10 +19,10 @@ declare sub draw_horz_scale	   (x as integer, y as integer, _
 								w as integer, h as integer, _
 								v as integer, mv as integer, _
 								s_color as Uinteger)
-declare sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr)
+declare sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr, turn_timing as single ptr)
 'prints on screen useful info for debug
 declare sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
-				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr)
+				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr, turn_timing as single)
 				
 declare sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer, status_sprite() as Uinteger ptr)
 
@@ -282,7 +282,7 @@ sub draw_horz_scale	   (		x as integer, y as integer, _
 	line (x + 1,y + 1)-(x + bar_w, y + h), rgb(255 - int(bar_c*2.5),int(bar_c*2.5), 0), BF							
 end sub
 
-sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr)
+sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr, turn_timing as single ptr)
 	dim c as integer
 	dim is_found as boolean = false
 
@@ -347,19 +347,22 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 			for c = 0 to Ubound(pl)
 				pl(c).has_moved = false
 			next c
-			
+			'find first alive player from other team
 			for c = *turn to Ubound(pl) step 2
 				if pl(c).is_alive then
 					*pl_sel = c
 					exit for
 				end if
 			next c
+			'reset timing
+			*turn_timing = Timer
+			
 		end if
 	end if
 end sub
 
 sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
-				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr)
+				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr, turn_timing as single)
 	dim t as integer
 	t = get_nrst_node(@Ball, Terrain_line())
 	
@@ -384,6 +387,7 @@ sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
 	draw string (20,140),"Mouse.clip       " + str(User_Mouse.clip)
 	draw string (20,150),"Mouse.diff_wheel " + str(User_Mouse.diff_wheel)
 	draw string (20,160),"Mouse.old_wheel  " + str(User_Mouse.old_wheel)
+	draw string (20,180),"turn timing  " + str(int(Timer - turn_timing))
 	
 	'player selected proprietes
 	draw string (pl(pl_sel).x, pl(pl_sel).y + 20), " PWR " + str(pl(pl_sel).power)

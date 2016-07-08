@@ -1,5 +1,5 @@
 #define GAME_NAME "GOALRILLA"
-#define GAME_VERSION 			0.06
+#define GAME_VERSION 			0.07
 #define SCR_W 					640
 #define SCR_H 					480
 #define SECTIONS 				80
@@ -41,6 +41,7 @@ const BALL_MAX_SPEED as single = 25.0f
 const BALL_MIN_SPEED as Single 	= 0.01f
 'player moving speed
 const PL_MOVING_SPEED as integer = 5
+const MAX_TURN_TIMING_SECS as integer = 9
 
 
 

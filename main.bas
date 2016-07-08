@@ -32,6 +32,8 @@ dim pl_sprite_0(0 to 31) 			as Uinteger ptr
 dim pl_sprite_1(0 to 31)			as Uinteger ptr
 dim status_sprite(0 to 2) 			as Uinteger ptr
 dim terrain_sprite (0 to 15) 		as Uinteger ptr
+dim big_numbers (0 to 9) 			as Uinteger ptr
+dim turn_timing						as single
 dim game_section 					as proto_game_section
 game_section = splashscreen
 DIM SHARED Workpage 				AS INTEGER
@@ -44,6 +46,7 @@ load_bmp (pl_sprite_0(), 84, 200, 4, 8,"img\pl_sprites_0.bmp")
 load_bmp (pl_sprite_1(), 84, 200, 4, 8,"img\pl_sprites_1.bmp")
 load_bmp (status_sprite(), 78, 32, 3, 1,"img\status_sprite.bmp")
 load_bmp (terrain_sprite(), 128, 128, 4, 4,"img\terrain.bmp")
+load_bmp (big_numbers(), 280, 32, 10, 1,"img\numbers.bmp")
 
 dim e As EVENT
 DO
@@ -76,8 +79,25 @@ DO
 			init_ground(Terrain_line())
 			'init pl positions
 			init_pl_positions(pl(), Terrain_line())
+			turn_timing = Timer
 			game_section = game
 		case game
+			'check if a team has win
+			if count_alive(pl(), 0) = 0 or count_alive(pl(), 1) = 0 then
+				game_section = splashscreen
+			end if
+			'change turn every ten seconds
+			if Timer - turn_timing > MAX_TURN_TIMING_SECS then
+				turn = 1 - turn
+				turn_timing = Timer
+				'find first alive player from other team
+				for c = turn to Ubound(pl) step 2
+					if pl(c).is_alive then
+						pl_sel = c
+						exit for
+					end if
+				next c
+			end if
 			draw_background(Terrain_line())
 
 			dim t as integer
@@ -117,7 +137,7 @@ DO
 			end if
 			
 			'get user input
-			get_mouse (Ball, User_Mouse, @pl_sel, pl(), @turn)
+			get_mouse (Ball, User_Mouse, @pl_sel, pl(), @turn, @turn_timing)
 			
 			'draws terrain sprite overlayed
 			for c = 0 to BMP_TILE_TOT - 1
@@ -132,9 +152,16 @@ DO
 			draw_ball(Ball, Ball_sprite())
 			draw_player_stats (pl(), pl_sel, turn, status_sprite())
 			
+			if turn then
+				line (SCR_W\2 - 16, 38)-(SCR_W\2 + 16, 42), C_RED, BF
+			else
+				line (SCR_W\2 - 16, 38)-(SCR_W\2 + 16, 42), C_YELLOW,BF
+			end if
+			put(SCR_W\2 - 14, 10), big_numbers(int(MAX_TURN_TIMING_SECS - (Timer - turn_timing))), trans
+			
 			'draw debug info by pressing run-time D Key
 			if (Debug_mode) then
-				draw_debug (Ball, pl(), pl_sel, User_Mouse, Terrain_line(), @turn)
+				draw_debug (Ball, pl(), pl_sel, User_Mouse, Terrain_line(), @turn, turn_timing)
 			end if
 	
 	end select
