@@ -13,13 +13,13 @@ declare sub init_pl_positions(pl() as player_proto, terrain_line() as terrain)
 declare sub draw_background(Terrain_line() as Terrain)
 declare sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sprite_t0() as Uinteger ptr, sprite_t1() as Uinteger ptr)
 declare sub draw_ball(Ball as ball_proto, ball_sprite() as Uinteger ptr)
-declare sub draw_trajectory(pl() as player_proto, pl_sel as integer, User_Mouse as mouse)
+declare sub draw_trajectory_preview(pl() as player_proto, pl_sel as integer, User_Mouse as mouse)
 'draws a bar scale
 declare sub draw_horz_scale	   (x as integer, y as integer, _
 								w as integer, h as integer, _
 								v as integer, mv as integer, _
 								s_color as Uinteger)
-declare sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr, turn_timing as single ptr)
+declare sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr, turn_timing as single ptr, Ball_Record() as ball_proto)
 'prints on screen useful info for debug
 declare sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
 				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr, turn_timing as single)
@@ -31,6 +31,8 @@ declare sub load_bmp ( bmp() as Uinteger ptr, w as integer, h as integer, _
 
 declare function count_alive(pl() as player_proto, n_team as integer) as integer
 declare function start_frame (rds as single) as integer
+
+declare sub reset_ball_recording(Ball_Record() as ball_proto, x as single, y as single)
 
 function get_diff_angle(alfa as single, beta as single) as single
     if alfa <> beta  then
@@ -243,7 +245,7 @@ sub init_particles(x as integer, y as integer, particles() as ball_proto)
 	next c
 end sub
 
-sub draw_trajectory(pl() as player_proto, pl_sel as integer, User_Mouse as mouse)
+sub draw_trajectory_preview(pl() as player_proto, pl_sel as integer, User_Mouse as mouse)
 	dim as single temp_x, temp_y, temp_rds, temp_speed
 	dim c as integer 
 	temp_rds = _abtp(pl(pl_sel).x, pl(pl_sel).y, _
@@ -282,7 +284,9 @@ sub draw_horz_scale	   (		x as integer, y as integer, _
 	line (x + 1,y + 1)-(x + bar_w, y + h), rgb(255 - int(bar_c*2.5),int(bar_c*2.5), 0), BF							
 end sub
 
-sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr, turn_timing as single ptr)
+sub get_mouse (	Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, _
+				pl() as player_proto, turn as integer ptr, turn_timing as single ptr, _
+				Ball_Record() as ball_proto)
 	dim c as integer
 	dim is_found as boolean = false
 
@@ -319,7 +323,7 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 	end if
 	
 	if Ball.is_active = false and pl(*pl_sel).is_alive then
-		draw_trajectory(pl(), *pl_sel, User_Mouse)
+		draw_trajectory_preview(pl(), *pl_sel, User_Mouse)
 		'move the player
 		if CBool(User_Mouse.buttons = 2) and pl(*pl_sel).has_moved = false then
 			pl(*pl_sel).speed = PL_MOVING_SPEED
@@ -347,6 +351,10 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 			for c = 0 to Ubound(pl)
 				pl(c).has_moved = false
 			next c
+			
+			'reset the recording of the ball to the position of player
+			reset_ball_recording(Ball_Record(), pl(*pl_sel).x, pl(*pl_sel).y)
+			
 			'find first alive player from other team
 			for c = *turn to Ubound(pl) step 2
 				if pl(c).is_alive then
@@ -356,6 +364,7 @@ sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, p
 			next c
 			'reset timing
 			*turn_timing = Timer
+			
 			
 		end if
 	end if
@@ -529,6 +538,73 @@ next c
 return c
 
 end function
+
+sub reset_ball_recording(Ball_Record() as ball_proto, x as single, y as single)
+	'reset ball record position 
+	dim c as integer
+	for c = 0 to Ubound(Ball_Record)
+		Ball_Record(c).x = x
+		Ball_Record(c).y = y
+	next c
+end sub
+
+sub draw_trajectory(Ball_Record() as ball_proto, ball_record_slot as integer)
+	dim temp_slot1 as integer = ball_record_slot - 1
+	dim temp_slot2 as integer = temp_slot1 - 1
+	dim c as integer = 0
+	dim a as integer = 0
+	dim points(0 to 3) as ball_proto
+	dim as single rds = 0
+	dim as single picker_x, picker_y
+	dim as integer color_pick = 0  
+	for c = 0 to Ubound(Ball_Record) - 1
+		'check that the slot doesnt' goes outside array bounds
+		if temp_slot2 < 0 then temp_slot2 = Ubound(Ball_Record)
+		if temp_slot1 < 0 then temp_slot1 = Ubound(Ball_Record)
+		if temp_slot1 > Ubound(Ball_Record) then
+			temp_slot1 = 0
+			temp_slot2 = Ubound(Ball_Record)
+		end if
+		if temp_slot2 > Ubound(Ball_Record) then
+			temp_slot2 = 0
+		end if
+		'------------------------------------------------------
+		
+		rds = _abtp(	Ball_Record(temp_slot1).x, _
+						Ball_Record(temp_slot1).y, _
+						Ball_Record(temp_slot2).x, _
+						Ball_Record(temp_slot2).y)
+						
+		points(0).x = Ball_Record(temp_slot1).x + (8-(c+5)\5) * cos(rds + PI_HALF)
+		points(0).y = Ball_Record(temp_slot1).y + (8-(c+5)\5)  * -sin(rds + PI_HALF)
+		points(1).x = Ball_Record(temp_slot1).x + (8-(c+5)\5)  * cos(rds - PI_HALF)
+		points(1).y = Ball_Record(temp_slot1).y + (8-(c+5)\5)  * -sin(rds - PI_HALF)
+		points(2).x = Ball_Record(temp_slot2).x + (8-(c+5)\5)  * cos(rds + PI_HALF)
+		points(2).y = Ball_Record(temp_slot2).y + (8-(c+5)\5)  * -sin(rds + PI_HALF)
+		points(3).x = Ball_Record(temp_slot2).x + (8-(c+5)\5)  * cos(rds - PI_HALF)
+		points(3).y = Ball_Record(temp_slot2).y + (8-(c+5)\5)  * -sin(rds - PI_HALF)
+		
+		picker_x = points(0).x + d_b_t_p(points(0).x, points(0).y, points(3).x, points(3).y) / 2 * _
+					cos(_abtp(points(0).x, points(0).y, points(3).x, points(3).y))
+		picker_y = points(0).y + d_b_t_p(points(0).x, points(0).y, points(3).x, points(3).y) / 2 * _
+					-sin(_abtp(points(0).x, points(0).y, points(3).x, points(3).y))
+		
+		color_pick = rgb(255-c*8, 255-c*8,255)
+		
+		line (points(0).x, points(0).y) - (points(1).x, points(1).y), color_pick
+		line (points(1).x, points(1).y) - (points(3).x, points(3).y), color_pick
+		line (points(3).x, points(3).y) - (points(2).x, points(2).y), color_pick
+		line (points(2).x, points(2).y) - (points(0).x, points(0).y), color_pick
+
+		paint (picker_x, picker_y), color_pick, color_pick
+		
+		temp_slot1 -=1
+		temp_slot2 -=1
+	next c
+end sub
+
+
+
 
 
 

@@ -21,7 +21,8 @@ Randomize Timer()
 Dim Terrain_line(0 to SECTIONS-1) 	as Terrain
 Dim Ball 							as ball_proto
 dim particles(0 to 9) 				as ball_proto
-Dim Ball_Record(0 to 20) 			as ball_proto
+Dim Ball_Record(0 to 29) 			as ball_proto
+dim ball_record_slot				as integer
 Dim pl(0 to 9)	 					as player_proto
 Dim User_Mouse 						as mouse
 dim pl_sel 							as integer = 0
@@ -36,6 +37,7 @@ dim big_numbers (0 to 9) 			as Uinteger ptr
 dim turn_timing						as single
 dim game_section 					as proto_game_section
 game_section = splashscreen
+ball_record_slot = 0
 DIM SHARED Workpage 				AS INTEGER
 
 dim c as integer
@@ -82,11 +84,11 @@ DO
 			turn_timing = Timer
 			game_section = game
 		case game
-			'check if a team has win
+			'check if a team has win____________________________________
 			if count_alive(pl(), 0) = 0 or count_alive(pl(), 1) = 0 then
 				game_section = splashscreen
 			end if
-			'change turn every ten seconds
+			'change turn every ten seconds______________________________
 			if Timer - turn_timing > MAX_TURN_TIMING_SECS then
 				turn = 1 - turn
 				turn_timing = Timer
@@ -131,25 +133,43 @@ DO
 						end if
 					next c
 					Ball.is_active = false
+					
 				end if
 			else
 				update_ball (@Ball)
+				'record ball position___________________________________
+				
+				
+				Ball_Record(ball_record_slot).x = ball.x
+				Ball_Record(ball_record_slot).y = ball.y
+				ball_record_slot +=1
+				if ball_record_slot > Ubound (Ball_Record) then 
+					ball_record_slot = 0
+				end if
+				
+				'_______________________________________________________
+				
 			end if
 			
 			'get user input
-			get_mouse (Ball, User_Mouse, @pl_sel, pl(), @turn, @turn_timing)
-			
+			get_mouse (Ball, User_Mouse, @pl_sel, pl(), @turn, @turn_timing, Ball_Record())
+			'draw the trajectory of the ball____________________________
+			if Ball.is_active then
+				draw_trajectory(Ball_Record(), ball_record_slot)
+			end if
 			'draws terrain sprite overlayed
-			for c = 0 to BMP_TILE_TOT - 1
-				put ((c mod BMP_TILE_COLS) * BMP_TILE_W, _
-					(c \ BMP_TILE_COLS) * BMP_TILE_H), terrain_sprite(4), and
-			next c
+			'for c = 0 to BMP_TILE_TOT - 1
+		'		put ((c mod BMP_TILE_COLS) * BMP_TILE_W, _
+	'				(c \ BMP_TILE_COLS) * BMP_TILE_H), terrain_sprite(4), and
+'			next c
 			'-------
 			
 			draw_particles(particles())
 			'draw players
 			draw_players(ball, pl(), pl_sel, pl_sprite_0(), pl_sprite_1())
 			draw_ball(Ball, Ball_sprite())
+			
+			'___________________________________________________________
 			draw_player_stats (pl(), pl_sel, turn, status_sprite())
 			
 			if turn then

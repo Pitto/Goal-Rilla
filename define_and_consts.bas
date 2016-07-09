@@ -30,6 +30,7 @@ const BMP_TILE_ROWS	as integer = SCR_H \ BMP_TILE_H
 const BMP_TILE_TOT as integer = BMP_TILE_COLS * BMP_TILE_ROWS
 
 const PI as single = 3.14159f
+const PI_HALF as single = 1.570795f
 
 const GRAVITY_ACCEL as single 	= 9.80665f
 const GRAVITY 		as single 	= 0.980665f
