@@ -5,3 +5,8 @@ enum proto_game_section
 	game
 	credits
 end enum
+
+enum obj_to_follow
+	ball_proto
+	player
+end enum

@@ -12,18 +12,20 @@ Randomize Timer()
     -Atan2(y2-y1,x2-x1)
 #endmacro
 
+#include "enums.bi"
 #include "types.bas"
 #include "define_and_consts.bas"
 #include "subs.bas"
-#include "enums.bi"
+
 		
 'initialize Types
 Dim Terrain_line(0 to SECTIONS-1) 	as Terrain
 Dim Ball 							as ball_proto
 dim particles(0 to 9) 				as ball_proto
-Dim Ball_Record(0 to 29) 			as ball_proto
+dim clouds(0 to 20) 					as generic_item_proto
+Dim Ball_Record(0 to 24) 			as ball_proto
 dim ball_record_slot				as integer
-Dim pl(0 to 9)	 					as player_proto
+Dim pl(0 to 19)	 					as player_proto
 Dim User_Mouse 						as mouse
 dim pl_sel 							as integer = 0
 Dim turn 							as integer = 0
@@ -36,12 +38,32 @@ dim terrain_sprite (0 to 15) 		as Uinteger ptr
 dim big_numbers (0 to 9) 			as Uinteger ptr
 dim turn_timing						as single
 dim game_section 					as proto_game_section
+dim camera							as camera_proto
+dim c as integer
+
+'init some vars
+camera.x = 0
+camera.x_offset = 0
+camera.y = 0 
+camera.speed = 0
+camera.obj = player
 game_section = splashscreen
 ball_record_slot = 0
+ball.is_active = false
+
+for c = 0 to Ubound(clouds)
+	clouds(c).x = rnd * TERRAIN_WIDTH
+	clouds(c).y = -(rnd * 300)
+	clouds(c).w = rnd * 20
+next c
+
+
 DIM SHARED Workpage 				AS INTEGER
 
-dim c as integer
+
 screenres SCR_W, SCR_H, 24
+'hides the mouse
+SetMouse 320, 240, 0
 
 load_bmp (ball_sprite(), 80, 16, 5, 1,"img\ball_sprites.bmp")
 load_bmp (pl_sprite_0(), 84, 200, 4, 8,"img\pl_sprites_0.bmp")
@@ -100,24 +122,54 @@ DO
 					end if
 				next c
 			end if
-			draw_background(Terrain_line())
+
+
+	if ball.is_active then
+		camera.speed = d_b_t_p(camera.x, camera.y, ball.x, ball.y) / 25
+		camera.x += cos(_abtp(camera.x, camera.y, ball.x, ball.y))*camera.speed 
+		camera.y += -sin(_abtp(camera.x, camera.y, ball.x, ball.y))*camera.speed 
+    else
+		camera.speed = d_b_t_p(camera.x, camera.y, pl(pl_sel).x, pl(pl_sel).y) / 25
+		camera.x += cos(_abtp(camera.x, camera.y, pl(pl_sel).x, pl(pl_sel).y))*camera.speed 
+		camera.y += -sin(_abtp(camera.x, camera.y, pl(pl_sel).x, pl(pl_sel).y))*camera.speed 
+    end if
+    
+        'padding & border limit check
+    if (camera.x < 0 + SCR_W\2) then
+        camera.x = 0 + SCR_W\2
+    end if
+    if (camera.x > TERRAIN_WIDTH - SCR_W\2) then
+        camera.x = TERRAIN_WIDTH - SCR_W\2
+    end if
+    
+    if (camera.y < -SCR_H\2 + 150) then
+        camera.y = -SCR_H\2 + 150
+    end if
+    if (camera.y > SCR_H\2) then
+        camera.y = SCR_H\2
+    end if
+    
+    camera.x_offset = camera.x - SCR_W\2
+    camera.y_offset = camera.y - SCR_H\2
+
+			draw_background(Terrain_line(), camera)
 
 			dim t as integer
-			t = get_nrst_node(@Ball, Terrain_line())
+			t = get_nrst_node(ball.x, ball.y, Terrain_line())
 			
-			update_players (pl())
+			update_players (pl(), camera, Terrain_line())
 			'update particles position
 			update_particles(particles())
 			
-			if point(Ball.x, Ball.y) <> C_BLUE and Ball.y > 1 then
+			if point(Ball.x - camera.x_offset, Ball.y - camera.y_offset) <> C_BLUE then
 				if Ball.is_active then
-					'modify the ground profile
+					'modify the ground profile when the ball impacts
 					Terrain_line(t).y += 16
 					if t < Ubound(Terrain_line) and t > 0 then
 						terrain_line(t-1).y +=8
 						terrain_line(t+1).y +=8
 					end if
-						
+					'initialize the position of the particles
 					init_particles(Ball.x, Ball.y, particles())
 					'check collision of the ball with each player
 					for c = 0 to Ubound(pl)
@@ -138,50 +190,68 @@ DO
 			else
 				update_ball (@Ball)
 				'record ball position___________________________________
-				
-				
 				Ball_Record(ball_record_slot).x = ball.x
 				Ball_Record(ball_record_slot).y = ball.y
 				ball_record_slot +=1
 				if ball_record_slot > Ubound (Ball_Record) then 
 					ball_record_slot = 0
-				end if
-				
+				end if			
 				'_______________________________________________________
 				
 			end if
 			
 			'get user input
-			get_mouse (Ball, User_Mouse, @pl_sel, pl(), @turn, @turn_timing, Ball_Record())
+			get_mouse (Ball, User_Mouse, @pl_sel, pl(), @turn, @turn_timing, Ball_Record(), camera)
 			'draw the trajectory of the ball____________________________
 			if Ball.is_active then
-				draw_trajectory(Ball_Record(), ball_record_slot)
+				draw_trajectory(Ball_Record(), ball_record_slot, camera)
 			end if
-			'draws terrain sprite overlayed
-			'for c = 0 to BMP_TILE_TOT - 1
-		'		put ((c mod BMP_TILE_COLS) * BMP_TILE_W, _
-	'				(c \ BMP_TILE_COLS) * BMP_TILE_H), terrain_sprite(4), and
-'			next c
-			'-------
-			
-			draw_particles(particles())
+			'draw the preview of the launch of the ball
+			if Ball.is_active = false and pl(pl_sel).is_alive then
+				draw_trajectory_preview(pl(), pl_sel, User_Mouse, camera)
+			end if
+			'draws mouse direction
+			draw_arrow	(pl(pl_sel).x - camera.x_offset, pl(pl_sel).y - camera.y_offset, _
+						_abtp ((pl(pl_sel).x - camera.x_offset), _
+						(pl(pl_sel).y- camera.y_offset), _
+						User_Mouse.x , User_Mouse.y ), 50, C_RED)
+			'draw particles if the bal hit the terrain		
+			draw_particles(particles(), camera)
 			'draw players
-			draw_players(ball, pl(), pl_sel, pl_sprite_0(), pl_sprite_1())
-			draw_ball(Ball, Ball_sprite())
+			draw_players(ball, pl(), pl_sel, pl_sprite_0(), pl_sprite_1(), camera)
+			'draws the ball
+			draw_ball(Ball, Ball_sprite(), camera)
+			
+			'draw clouds
+			for c = 0 to Ubound(clouds)
+				circle (clouds(c).x - camera.x_offset, _
+						clouds(c).y - camera.y_offset),  clouds(c).w, c_WHITE,,,0.5,F
+				circle (clouds(c).x - (c mod 3) * 3 - camera.x_offset, _
+						clouds(c).y - (c mod 3) * 5 - camera.y_offset),  clouds(c).w*2, c_WHITE,,,0.3,F
+			next c
 			
 			'___________________________________________________________
 			draw_player_stats (pl(), pl_sel, turn, status_sprite())
 			
+			'highlight turn___________________________________________
+			
 			if turn then
-				line (SCR_W\2 - 16, 38)-(SCR_W\2 + 16, 42), C_RED, BF
+				line (SCR_W\2 - 16, 20)-(SCR_W\2 + 16, 42), C_RED, BF
 			else
-				line (SCR_W\2 - 16, 38)-(SCR_W\2 + 16, 42), C_YELLOW,BF
+				line (SCR_W\2 - 16, 20)-(SCR_W\2 + 16, 42), C_YELLOW,BF
 			end if
-			put(SCR_W\2 - 14, 10), big_numbers(int(MAX_TURN_TIMING_SECS - (Timer - turn_timing))), trans
+			draw string (SCR_W\2 - 8, 10), str(MAX_TURN_TIMING_SECS - int(Timer - turn_timing))
+			'________________________
+			
+			'draw mouse
+			
+			line (User_Mouse.x - 5, User_Mouse.y)- (User_Mouse.x +5, User_Mouse.y)
+			line (User_Mouse.x, User_Mouse.y +5)- (User_Mouse.x, User_Mouse.y - 5)
+			
 			
 			'draw debug info by pressing run-time D Key
 			if (Debug_mode) then
-				draw_debug (Ball, pl(), pl_sel, User_Mouse, Terrain_line(), @turn, turn_timing)
+				draw_debug (Ball, pl(), pl_sel, User_Mouse, Terrain_line(), @turn, turn_timing, camera)
 			end if
 	
 	end select

@@ -10,19 +10,26 @@ declare sub init_terrain_line(	x as single, y as single, rds as single, _
 								
 declare sub update_ball (coords as ball_proto ptr)
 declare sub init_pl_positions(pl() as player_proto, terrain_line() as terrain)
-declare sub draw_background(Terrain_line() as Terrain)
-declare sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sprite_t0() as Uinteger ptr, sprite_t1() as Uinteger ptr)
-declare sub draw_ball(Ball as ball_proto, ball_sprite() as Uinteger ptr)
-declare sub draw_trajectory_preview(pl() as player_proto, pl_sel as integer, User_Mouse as mouse)
+declare sub draw_background(Terrain_line() as Terrain, camera as camera_proto)
+declare sub draw_players(	ball as ball_proto, pl() as player_proto, _
+							pl_sel as integer, sprite_t0() as Uinteger ptr, _
+							sprite_t1() as Uinteger ptr, camera as camera_proto)
+declare sub draw_ball(Ball as ball_proto, ball_sprite() as Uinteger ptr, camera as camera_proto)
+declare sub draw_trajectory_preview(pl() as player_proto, pl_sel as integer, User_Mouse as mouse,  camera as camera_proto)
 'draws a bar scale
 declare sub draw_horz_scale	   (x as integer, y as integer, _
 								w as integer, h as integer, _
 								v as integer, mv as integer, _
 								s_color as Uinteger)
-declare sub get_mouse (Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, pl() as player_proto, turn as integer ptr, turn_timing as single ptr, Ball_Record() as ball_proto)
+declare sub get_mouse (	Ball as ball_proto, User_Mouse as mouse, _
+						pl_sel as integer ptr, pl() as player_proto, _
+						turn as integer ptr, turn_timing as single ptr, _
+						Ball_Record() as ball_proto, camera as camera_proto)
 'prints on screen useful info for debug
 declare sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
-				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr, turn_timing as single)
+				User_Mouse as mouse, Terrain_line() as Terrain, _
+				turn as integer ptr, turn_timing as single, _
+				camera as camera_proto)
 				
 declare sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer, status_sprite() as Uinteger ptr)
 
@@ -66,39 +73,46 @@ sub draw_arrow(x as single, y as single, rds as single, a_l as single, cl as Uin
     line (x + a_l * cos(rds), y + a_l *  -sin(rds))-(x + (a_l-10) * cos(rds+0.5), y + (a_l-10) *  -sin(rds+0.5)),cl
 end sub
 
-function get_nrst_node(bc as ball_proto ptr, tc() as Terrain) as Integer
+function get_nrst_node(x as single, y as single, tc() as Terrain) as Integer
     dim max_dist as integer = 1000
     dim as Integer c, id
     for c = 2 to Ubound(tc)-2
-        if d_b_t_p(bc->x, bc->y,tc(c).x,tc(c).y) < max_dist then
-			max_dist = d_b_t_p(bc->x, bc->y,tc(c).x,tc(c).y)
+        if d_b_t_p(x, y,tc(c).x,tc(c).y) < max_dist then
+			max_dist = d_b_t_p(x, y,tc(c).x,tc(c).y)
 			id = c
 		end if
     next c
     return id
 end function
 
-sub update_players(pl() as player_proto)
+sub update_players(pl() as player_proto, camera as camera_proto, terrain_line() as Terrain)
 	dim c as integer
 	for c = 0 to Ubound(pl)
 		pl(c).old_x = pl(c).x
 		pl(c).old_y = pl(c).y
-		if point(pl(c).x - pl(c).w\2, pl(c).y + pl(c).h + 3) = C_BLUE then
-			pl(c).y +=2
-			pl(c).speed *= GRAVITY
+		
+		if pl(c).y < terrain_line(get_nrst_node(pl(c).x, pl(c).y, terrain_line())).y then
+			pl(c).y += 3
+		else
+			pl(c).y =  terrain_line(get_nrst_node(pl(c).x, pl(c).y, terrain_line())).y
 		end if
+		
+		'if point(pl(c).x - pl(c).w\2 - camera.x_offset, pl(c).y + pl(c).h + 3 - camera.y_offset) = C_BLUE then	
+			'pl(c).y +=2
+			'pl(c).speed *= GRAVITY
+		'end if
 		if pl(c).speed > 1 then
 			pl(c).x += pl(c).speed*cos(pl(c).rds)
 			pl(c).y += pl(c).speed*-sin(pl(c).rds)
 			pl(c).speed *= GRAVITY
 			'bound check
-			if pl(c).x + pl(c).w > SCR_W then
-				pl(c).x = SCR_W - pl(c).w - 10
-				pl(c).rds = -pl(c).rds
+			if pl(c).x + pl(c).w > TERRAIN_WIDTH then
+				pl(c).x = TERRAIN_WIDTH - pl(c).w - 10
+				pl(c).rds = pl(c).rds + PI_HALF
 			end if
 			if pl(c).x < 0 then
 				pl(c).x = 10
-				pl(c).rds = -pl(c).rds
+				pl(c).rds = pl(c).rds + PI_HALF
 			end if
 		else
 			pl(c).speed = 0
@@ -150,33 +164,36 @@ sub init_ground (Terrain_line() as Terrain)
 			init_terrain_line(	Terrain_line(c).x, Terrain_line(c).y, _
 								angle, length, @Terrain_line(c+1))
 		else
-			Terrain_line(SECTIONS-1).x = SCR_W
+			Terrain_line(SECTIONS-1).x = TERRAIN_WIDTH
 			Terrain_line(SECTIONS-1).y = SCR_TOP_MARGIN
 		end if
 	next c
 end sub
 
-sub draw_background(Terrain_line() as Terrain)
+sub draw_background(Terrain_line() as Terrain, camera as camera_proto)
 	dim c as integer
+	
+	line(0,0)-(SCR_W, SCR_H),C_DARK_GREEN,BF
 	
 	'draw the ground line
 	for c = 0 to Ubound(Terrain_line)
 		if c < Ubound(Terrain_line) - 1 then
-			line (Terrain_line(c).x, Terrain_line(c).y)-(Terrain_line(c +1).x, Terrain_line(c+1).y), C_BLUE
-			line (Terrain_line(c).x, Terrain_line(c).y +20)-(Terrain_line(c +1).x, Terrain_line(c+1).y + 20), C_BLUE
-			line (Terrain_line(c).x, Terrain_line(c).y +20)-(Terrain_line(c).x, Terrain_line(c).y), C_BLUE
+			line (Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset)-(Terrain_line(c +1).x - camera.x_offset, Terrain_line(c+1).y - camera.y_offset), C_BLUE
+			line (Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset +20)-(Terrain_line(c +1).x - camera.x_offset, Terrain_line(c+1).y - camera.y_offset + 20), C_BLUE
+			line (Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset +20)-(Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset), C_BLUE
+			paint (Terrain_line(c).x - camera.x_offset -2, Terrain_line(c).y - camera.y_offset +10), C_GREEN, C_BLUE
 		else
-			line (Terrain_line(c-1).x, Terrain_line(c-1).y)-(Terrain_line(c).x, Terrain_line(c).y), C_BLUE
-			line (Terrain_line(c-1).x, Terrain_line(c-1).y +20)-(Terrain_line(c).x, Terrain_line(c).y +20 ), C_BLUE
-
+			line (Terrain_line(c-1).x - camera.x_offset, Terrain_line(c-1).y - camera.y_offset)-(Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset), C_BLUE
+			line (Terrain_line(c-1).x - camera.x_offset, Terrain_line(c-1).y - camera.y_offset +20)-(Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset +20 ), C_BLUE
+			
 		end if
 	next c
 	' fill the background
 	paint (SCR_W \ 2, 2), C_BLUE, C_BLUE
-	paint (SCR_W \ 2, SCR_H - 2), C_DARK_GREEN, C_BLUE
+	'paint (SCR_W \ 2, SCR_H - 2), C_DARK_GREEN, C_BLUE
 end sub
 
-sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sprite_t0() as Uinteger ptr, sprite_t1() as Uinteger ptr)
+sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sprite_t0() as Uinteger ptr, sprite_t1() as Uinteger ptr, camera as camera_proto)
 	dim c as integer
 	dim sprite as integer
 	for c = 0 to Ubound(pl)
@@ -184,7 +201,7 @@ sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sp
 		'draws a line around the selected player
 		if c = pl_sel then
 	
-			draw_horz_scale	   (pl(c).x - pl(c).w\2 - 2, pl(c).y + pl(c).h + 10, _
+			draw_horz_scale	   (pl(c).x - pl(c).w\2 - 2 - camera.x_offset, pl(c).y + pl(c).h + 10 - camera.y_offset, _
 								20, 5, pl(c).power, 100, C_GRAY)
 			
 		end if
@@ -195,21 +212,21 @@ sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sp
 				sprite = start_frame (_abtp (pl(c).x,pl(c).y, pl(c).old_x,pl(c).old_y )) + 1
 			end if
 			
-			put (pl(c).x - 10, pl(c).y - 5), sprite_t0(sprite), trans
+			put (pl(c).x - camera.x_offset - 10, pl(c).y - camera.y_offset - 5), sprite_t0(sprite), trans
 		else
 			if pl(c).speed then
 				sprite = start_frame (_abtp (pl(c).x,pl(c).y, pl(c).old_x,pl(c).old_y )) + 1
 			end if
 	
-			put (pl(c).x - 10, pl(c).y - 5), sprite_t1(sprite), trans
+			put (pl(c).x - camera.x_offset - 10, pl(c).y - camera.y_offset - 5), sprite_t1(sprite), trans
 		end if
 		
 	next c
 end sub
 
-sub draw_ball(Ball as ball_proto, ball_sprite() as Uinteger ptr)
+sub draw_ball(Ball as ball_proto, ball_sprite() as Uinteger ptr, camera as camera_proto)
 	if Ball.is_active then
-		put (Ball.x - 8, Ball.y - 8), ball_sprite(int((timer * 10) mod Ubound(ball_sprite))), trans
+		put (Ball.x - 8 - camera.x_offset, Ball.y - 8 - camera.y_offset), ball_sprite(int((timer * 10) mod Ubound(ball_sprite))), trans
 	end if
 end sub
 
@@ -218,19 +235,23 @@ sub update_particles(particles() as ball_proto)
 	dim c as integer
 	for c = 0 to ubound(particles)
 		'check screen bounds
-		if 	particles(c).x > 0 and particles(c).x < SCR_W _
+		if 	particles(c).x > 0 and particles(c).x < TERRAIN_WIDTH _
 			and particles(c).y > 0 and particles(c).y < SCR_H then
-			particles(c).x += particles(c).speed * cos(particles(c).rds)
+			particles(c).x += particles(c).speed * cos(particles(c).rds) 
 			particles(c).y += particles(c).speed * -sin(particles(c).rds) + GRAVITY_ACCEL
 			particles(c).speed *= GRAVITY
 		end if
 	next c
 end sub
 
-sub draw_particles(particles() as ball_proto)
+sub draw_particles(particles() as ball_proto, camera as camera_proto)
 	dim c as integer
 	for c = 0 to ubound(particles)
-		Circle (particles(c).x, particles(c).y), particles(c).w, C_YELLOW,,,,F
+		if c mod 2 then
+			Circle (particles(c).x - camera.x_offset, particles(c).y - camera.y_offset), particles(c).w, C_YELLOW,,,,F
+		else
+			Circle (particles(c).x - camera.x_offset, particles(c).y - camera.y_offset), particles(c).w, C_ORANGE,,,,F
+		end if
 	next c
 end sub
 
@@ -245,17 +266,17 @@ sub init_particles(x as integer, y as integer, particles() as ball_proto)
 	next c
 end sub
 
-sub draw_trajectory_preview(pl() as player_proto, pl_sel as integer, User_Mouse as mouse)
+sub draw_trajectory_preview(pl() as player_proto, pl_sel as integer, User_Mouse as mouse, camera as camera_proto)
 	dim as single temp_x, temp_y, temp_rds, temp_speed
 	dim c as integer 
-	temp_rds = _abtp(pl(pl_sel).x, pl(pl_sel).y, _
-				User_Mouse.x, User_Mouse.y)
+	temp_rds = _abtp((pl(pl_sel).x - camera.x_offset), (pl(pl_sel).y - camera.y_offset), _
+				User_Mouse.x , User_Mouse.y)
 
-	temp_speed = d_b_t_p(pl(pl_sel).x, pl(pl_sel).y, _
+	temp_speed = d_b_t_p(pl(pl_sel).x - camera.x_offset, pl(pl_sel).y - camera.y_offset, _
 				User_Mouse.x, User_Mouse.y)/5
 	if temp_speed > BALL_MAX_SPEED then temp_speed = BALL_MAX_SPEED		
-	temp_x = pl(pl_sel).x
-	temp_y = pl(pl_sel).y
+	temp_x = pl(pl_sel).x - camera.x_offset
+	temp_y = pl(pl_sel).y - camera.y_offset
 	'draw coords of the ball
 	for c = 0 to 10
 		if (int(Timer)) mod 10 = c then
@@ -286,7 +307,7 @@ end sub
 
 sub get_mouse (	Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, _
 				pl() as player_proto, turn as integer ptr, turn_timing as single ptr, _
-				Ball_Record() as ball_proto)
+				Ball_Record() as ball_proto, camera as camera_proto)
 	dim c as integer
 	dim is_found as boolean = false
 
@@ -323,21 +344,24 @@ sub get_mouse (	Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, 
 	end if
 	
 	if Ball.is_active = false and pl(*pl_sel).is_alive then
-		draw_trajectory_preview(pl(), *pl_sel, User_Mouse)
+	
 		'move the player
 		if CBool(User_Mouse.buttons = 2) and pl(*pl_sel).has_moved = false then
 			pl(*pl_sel).speed = PL_MOVING_SPEED
 			pl(*pl_sel).y -= 20
-			pl(*pl_sel).rds = abs(_abtp(pl(*pl_sel).x, pl(*pl_sel).y, _
+			pl(*pl_sel).rds = abs(_abtp(		(pl(*pl_sel).x - camera.x_offset), _
+									(pl(*pl_sel).x - camera.x_offset), _
 									User_Mouse.x, User_Mouse.y))
 			pl(*pl_sel).has_moved = true
 		end if
 		'launch the ball
 		if User_Mouse.buttons = 1 then
-			Ball.rds = 	_abtp(		pl(*pl_sel).x, pl(*pl_sel).y, _
+			Ball.rds = 	_abtp(		(pl(*pl_sel).x - camera.x_offset), _
+									(pl(*pl_sel).y - camera.y_offset), _
 									User_Mouse.x, User_Mouse.y)
 									
-			Ball.speed = d_b_t_p(	pl(*pl_sel).x, pl(*pl_sel).y, _
+			Ball.speed = d_b_t_p(	(pl(*pl_sel).x - camera.x_offset), _
+									(pl(*pl_sel).y - camera.y_offset), _
 									User_Mouse.x, User_Mouse.y) / 5
 			'dont' allow the ball to go to fast					
 			if Ball.speed > BALL_MAX_SPEED then Ball.speed = BALL_MAX_SPEED
@@ -371,20 +395,24 @@ sub get_mouse (	Ball as ball_proto, User_Mouse as mouse, pl_sel as integer ptr, 
 end sub
 
 sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
-				User_Mouse as mouse, Terrain_line() as Terrain, turn as integer ptr, turn_timing as single)
+				User_Mouse as mouse, Terrain_line() as Terrain, _
+				turn as integer ptr, turn_timing as single, _
+				camera as camera_proto)
 	dim t as integer
-	t = get_nrst_node(@Ball, Terrain_line())
+	t = get_nrst_node(Ball.x, ball.y, Terrain_line())
 	
-	circle (Terrain_line(t).x, Terrain_line(t).y ), 4, C_ORANGE,,,,F
+	circle (Terrain_line(t).x - camera.x_offset, Terrain_line(t).y - camera.y_offset), 4, C_ORANGE,,,,F
 	circle (Terrain_line(t+1).x, Terrain_line(t+1).y ), 3, C_ORANGE,,,,F
 	circle (Terrain_line(t-1).x, Terrain_line(t-1).y ), 3, C_ORANGE,,,,F
 
-	draw_arrow(Ball.x, Ball.y, _abtp(Ball.old_x, Ball.old_y, Ball.x, Ball.y), Ball.speed * 4, C_CYAN)
+	draw_arrow(		Ball.x - camera.x_offset, Ball.y - camera.y_offset,_
+					_abtp(Ball.old_x, Ball.old_y, Ball.x, Ball.y), _
+					Ball.speed * 4, C_CYAN)
 	
 	draw string (20,20), str(hex(point(Ball.x, Ball.y)))
 	draw string (20,30), "Ball.x  " + str(int(Ball.x))
 	draw string (20,40), "Ball.y  " + str(int(Ball.y))
-	draw string (20,50), "Nrstnd  " + str(get_nrst_node(@Ball, Terrain_line()))
+	draw string (20,50), "Nrstnd  " + str(get_nrst_node(ball.x, ball.y, Terrain_line()))
 	draw string (20,60), "turn    " + str(*Turn)
 	draw string (20,70), "Alive#0 " + str(count_alive(pl(), 0))
 	draw string (20,80), "Alive#1 " + str(count_alive(pl(), 1))
@@ -399,11 +427,11 @@ sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
 	draw string (20,180),"turn timing  " + str(int(Timer - turn_timing))
 	
 	'player selected proprietes
-	draw string (pl(pl_sel).x, pl(pl_sel).y + 20), " PWR " + str(pl(pl_sel).power)
-	draw string (pl(pl_sel).x, pl(pl_sel).y + 30), "   X " + str(int(pl(pl_sel).x))
-	draw string (pl(pl_sel).x, pl(pl_sel).y + 40), "   Y " + str(int(pl(pl_sel).y))
-	draw string (pl(pl_sel).x, pl(pl_sel).y + 50), "  ID " + str(pl_sel)
-	draw string (pl(pl_sel).x, pl(pl_sel).y + 60), "TEAM " + str(pl(pl_sel).team)
+	draw string (pl(pl_sel).x - camera.x_offset, pl(pl_sel).y - camera.y_offset + 20), " PWR " + str(pl(pl_sel).power)
+	draw string (pl(pl_sel).x - camera.x_offset, pl(pl_sel).y - camera.y_offset + 30), "   X " + str(int(pl(pl_sel).x - camera.x_offset))
+	draw string (pl(pl_sel).x - camera.x_offset, pl(pl_sel).y - camera.y_offset + 40), "   Y " + str(int(pl(pl_sel).y - camera.y_offset))
+	draw string (pl(pl_sel).x - camera.x_offset, pl(pl_sel).y - camera.y_offset + 50), "  ID " + str(pl_sel)
+	draw string (pl(pl_sel).x - camera.x_offset, pl(pl_sel).y - camera.y_offset + 60), "TEAM " + str(pl(pl_sel).team)
 	
 	line (0,SCR_TOP_MARGIN)-(SCR_W, SCR_TOP_MARGIN), C_GRAY
 	line (0,SCR_BOTTOM_MARGIN)-(SCR_W, SCR_BOTTOM_MARGIN), C_GRAY
@@ -413,16 +441,20 @@ sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer,
 	dim as integer c, x, y, w, h, p, m, mb
 	w = 26 'width
 	h = 32 'heigth
-	p = 2 'padding
-	m = 5 'margin left/right
+	p = 1 'padding
+	m = 1 'margin left/right
 	mb = 40 'margin bottom
 	
 	for c = 0 to Ubound(pl)
 		if pl(c).team = 0 then
-			x = m+(w*c)+(p*c)
+			x = m+(w*c\2)+(p*c)
 			y = SCR_H - mb
 			'highlight selected player
-			if c = pl_sel then line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,BF
+			
+			if c = pl_sel then
+				y -= 10 
+				line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,BF
+			end if
 			'line(x,y)-(x+w, y-h), C_RED,BF
 			if pl(c).is_alive then
 				put (x, y), status_sprite(1),trans
@@ -431,10 +463,13 @@ sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer,
 			end if
 			draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
 		else
-			x = SCR_W - m -(w*c)-(p*c)
+			x = SCR_W - m -(w*c\2)-(p*c) - w\2
 			y = SCR_H - mb
 			'highlight selected player
-			if c = pl_sel then line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,B
+			if c = pl_sel then
+				y -= 10 
+				line(x-2,y+2)-(x+w+2, y+h+2), C_WHITE,BF
+			end if
 			if pl(c).is_alive then
 				put (x, y), status_sprite(0),trans
 			else
@@ -548,7 +583,7 @@ sub reset_ball_recording(Ball_Record() as ball_proto, x as single, y as single)
 	next c
 end sub
 
-sub draw_trajectory(Ball_Record() as ball_proto, ball_record_slot as integer)
+sub draw_trajectory(Ball_Record() as ball_proto, ball_record_slot as integer, camera as camera_proto)
 	dim temp_slot1 as integer = ball_record_slot - 1
 	dim temp_slot2 as integer = temp_slot1 - 1
 	dim c as integer = 0
@@ -575,28 +610,36 @@ sub draw_trajectory(Ball_Record() as ball_proto, ball_record_slot as integer)
 						Ball_Record(temp_slot2).x, _
 						Ball_Record(temp_slot2).y)
 						
-		points(0).x = Ball_Record(temp_slot1).x + (8-(c+5)\5) * cos(rds + PI_HALF)
-		points(0).y = Ball_Record(temp_slot1).y + (8-(c+5)\5)  * -sin(rds + PI_HALF)
-		points(1).x = Ball_Record(temp_slot1).x + (8-(c+5)\5)  * cos(rds - PI_HALF)
-		points(1).y = Ball_Record(temp_slot1).y + (8-(c+5)\5)  * -sin(rds - PI_HALF)
-		points(2).x = Ball_Record(temp_slot2).x + (8-(c+5)\5)  * cos(rds + PI_HALF)
-		points(2).y = Ball_Record(temp_slot2).y + (8-(c+5)\5)  * -sin(rds + PI_HALF)
-		points(3).x = Ball_Record(temp_slot2).x + (8-(c+5)\5)  * cos(rds - PI_HALF)
-		points(3).y = Ball_Record(temp_slot2).y + (8-(c+5)\5)  * -sin(rds - PI_HALF)
+		points(0).x = Ball_Record(temp_slot1).x + (7-(c+5)\5) * cos(rds + PI_HALF) 
+		points(0).y = Ball_Record(temp_slot1).y + (7-(c+5)\5)  * -sin(rds + PI_HALF)
+		points(1).x = Ball_Record(temp_slot1).x + (7-(c+5)\5)  * cos(rds - PI_HALF)
+		points(1).y = Ball_Record(temp_slot1).y + (7-(c+5)\5)  * -sin(rds - PI_HALF)
+		points(2).x = Ball_Record(temp_slot2).x + (7-(c+5)\5)  * cos(rds + PI_HALF)
+		points(2).y = Ball_Record(temp_slot2).y + (7-(c+5)\5)  * -sin(rds + PI_HALF)
+		points(3).x = Ball_Record(temp_slot2).x + (7-(c+5)\5)  * cos(rds - PI_HALF)
+		points(3).y = Ball_Record(temp_slot2).y + (7-(c+5)\5)  * -sin(rds - PI_HALF)
 		
 		picker_x = points(0).x + d_b_t_p(points(0).x, points(0).y, points(3).x, points(3).y) / 2 * _
-					cos(_abtp(points(0).x, points(0).y, points(3).x, points(3).y))
+					cos(_abtp(points(0).x, points(0).y, points(3).x, points(3).y)) 
 		picker_y = points(0).y + d_b_t_p(points(0).x, points(0).y, points(3).x, points(3).y) / 2 * _
-					-sin(_abtp(points(0).x, points(0).y, points(3).x, points(3).y))
+					-sin(_abtp(points(0).x, points(0).y, points(3).x, points(3).y)) 
 		
-		color_pick = rgb(255-c*8, 255-c*8,255)
+		color_pick = rgb(255 - c*10,255 - c*10,255)
+		'draws a circle on top of trajectory
+		if c = 0 then
+			circle	(	Ball_Record(temp_slot1).x - camera.x_offset, _
+						Ball_Record(temp_slot1).y - camera.y_offset),  5, c_WHITE,,,,F
+		end if
 		
-		line (points(0).x, points(0).y) - (points(1).x, points(1).y), color_pick
-		line (points(1).x, points(1).y) - (points(3).x, points(3).y), color_pick
-		line (points(3).x, points(3).y) - (points(2).x, points(2).y), color_pick
-		line (points(2).x, points(2).y) - (points(0).x, points(0).y), color_pick
-
-		paint (picker_x, picker_y), color_pick, color_pick
+		line (points(0).x - camera.x_offset, points(0).y - camera.y_offset) - (points(1).x - camera.x_offset, points(1).y - camera.y_offset), color_pick
+		line (points(1).x - camera.x_offset, points(1).y - camera.y_offset) - (points(3).x - camera.x_offset, points(3).y - camera.y_offset), color_pick
+		line (points(3).x - camera.x_offset, points(3).y - camera.y_offset) - (points(2).x - camera.x_offset, points(2).y - camera.y_offset), color_pick
+		line (points(2).x - camera.x_offset, points(2).y - camera.y_offset) - (points(0).x - camera.x_offset, points(0).y - camera.y_offset), color_pick
+		if (d_b_t_p (Ball_Record(temp_slot1).x - camera.x_offset, Ball_Record(temp_slot1).y - camera.y_offset, _
+					Ball_Record(temp_slot2).x - camera.x_offset, Ball_Record(temp_slot2).y - camera.y_offset )) _
+					> 3 then
+			paint (picker_x - camera.x_offset, picker_y - camera.y_offset), color_pick, color_pick
+		end if
 		
 		temp_slot1 -=1
 		temp_slot2 -=1

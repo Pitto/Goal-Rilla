@@ -3,6 +3,12 @@ type Terrain
 	y as single
 end type
 
+type generic_item_proto
+	x as single
+	y as single
+	w as single
+end type
+
 type ball_proto
 	x 		as single
 	y 		as single
@@ -13,6 +19,16 @@ type ball_proto
 	speed 	as single
 	is_active as boolean
 	w as single
+end type
+
+type camera_proto
+	x as single
+	x_offset as single
+	y as single
+	y_offset as single
+	obj as obj_to_follow
+	rds as single
+	speed as single
 end type
 
 type player_proto

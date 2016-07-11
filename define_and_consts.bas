@@ -1,9 +1,9 @@
 #define GAME_NAME "GOALRILLA"
-#define GAME_VERSION 			0.07
-#define SCR_W 					640
+#define GAME_VERSION 			"0.08"
+#define SCR_W 					640	
 #define SCR_H 					480
-#define SECTIONS 				80
-#define TERRAIN_WIDTH 			SCR_W
+#define SECTIONS 				100
+#define TERRAIN_WIDTH 			1024
 #define SECTION_W 				TERRAIN_WIDTH \ SECTIONS
 #define SCR_TOP_MARGIN 			100
 #define SCR_BOTTOM_MARGIN 		SCR_H - 100
@@ -20,7 +20,7 @@
 #define C_ORANGE 	&hFF7F00
 #define C_PURPLE 	&h7F007F
 #define C_DARK_RED 	&h7F0000
-#define C_DARK_GREEN &h007F00
+#define C_DARK_GREEN &h005500
 #define C_DARK_BLUE &h00007F
 
 const BMP_TILE_W as integer = 32
@@ -42,7 +42,7 @@ const BALL_MAX_SPEED as single = 25.0f
 const BALL_MIN_SPEED as Single 	= 0.01f
 'player moving speed
 const PL_MOVING_SPEED as integer = 5
-const MAX_TURN_TIMING_SECS as integer = 9
+const MAX_TURN_TIMING_SECS as integer = 20
 
 
 
