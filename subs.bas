@@ -31,7 +31,7 @@ declare sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as inte
 				turn as integer ptr, turn_timing as single, _
 				camera as camera_proto)
 				
-declare sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer, status_sprite() as Uinteger ptr)
+declare sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer, status_sprite() as Uinteger ptr, turn_timing as single)
 
 declare sub load_bmp ( bmp() as Uinteger ptr, w as integer, h as integer, _
 					   cols as integer, rows as integer, Byref bmp_path as string)
@@ -40,6 +40,9 @@ declare function count_alive(pl() as player_proto, n_team as integer) as integer
 declare function start_frame (rds as single) as integer
 
 declare sub reset_ball_recording(Ball_Record() as ball_proto, x as single, y as single)
+
+declare sub	update_turn_change (	turn_timing as single ptr, turn as integer ptr, _
+							pl() as player_proto, pl_sel as integer ptr)
 
 function get_diff_angle(alfa as single, beta as single) as single
     if alfa <> beta  then
@@ -172,25 +175,32 @@ end sub
 
 sub draw_background(Terrain_line() as Terrain, camera as camera_proto)
 	dim c as integer
-	
+	dim temp_color as Uinteger
 	line(0,0)-(SCR_W, SCR_H),C_DARK_GREEN,BF
+	
+	
 	
 	'draw the ground line
 	for c = 0 to Ubound(Terrain_line)
 		if c < Ubound(Terrain_line) - 1 then
+			if _abtp(Terrain_line(c).x, Terrain_line(c).y, Terrain_line(c+1).x, Terrain_line(c+1).y) < 0 then
+				temp_color = rgb(0,160,0)
+			else
+				temp_color = rgb (0,120,0)
+			end if
 			line (Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset)-(Terrain_line(c +1).x - camera.x_offset, Terrain_line(c+1).y - camera.y_offset), C_BLUE
 			line (Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset +20)-(Terrain_line(c +1).x - camera.x_offset, Terrain_line(c+1).y - camera.y_offset + 20), C_BLUE
 			line (Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset +20)-(Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset), C_BLUE
-			paint (Terrain_line(c).x - camera.x_offset -2, Terrain_line(c).y - camera.y_offset +10), C_GREEN, C_BLUE
+			paint (Terrain_line(c).x - camera.x_offset -2, Terrain_line(c).y - camera.y_offset +10), temp_color, C_BLUE
 		else
 			line (Terrain_line(c-1).x - camera.x_offset, Terrain_line(c-1).y - camera.y_offset)-(Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset), C_BLUE
 			line (Terrain_line(c-1).x - camera.x_offset, Terrain_line(c-1).y - camera.y_offset +20)-(Terrain_line(c).x - camera.x_offset, Terrain_line(c).y - camera.y_offset +20 ), C_BLUE
 			
 		end if
 	next c
-	' fill the background
+	' fill the sky
 	paint (SCR_W \ 2, 2), C_BLUE, C_BLUE
-	'paint (SCR_W \ 2, SCR_H - 2), C_DARK_GREEN, C_BLUE
+	
 end sub
 
 sub draw_players(ball as ball_proto, pl() as player_proto, pl_sel as integer, sprite_t0() as Uinteger ptr, sprite_t1() as Uinteger ptr, camera as camera_proto)
@@ -437,7 +447,7 @@ sub draw_debug (Ball as ball_proto, pl() as player_proto, pl_sel as integer, _
 	line (0,SCR_BOTTOM_MARGIN)-(SCR_W, SCR_BOTTOM_MARGIN), C_GRAY
 end sub
 
-sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer, status_sprite() as Uinteger ptr)
+sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer, status_sprite() as Uinteger ptr, turn_timing as single)
 	dim as integer c, x, y, w, h, p, m, mb
 	w = 26 'width
 	h = 32 'heigth
@@ -478,6 +488,13 @@ sub draw_player_stats (pl() as player_proto, pl_sel as integer, turn as integer,
 			draw_horz_scale (x, y + h, w, 5, pl(c).power, 100, C_WHITE)
 		end if
 	next c
+	'draw the timer and the color of the selected team
+	if turn then
+		line (SCR_W\2 - 16, 20)-(SCR_W\2 + 16, 42), C_RED, BF
+	else
+		line (SCR_W\2 - 16, 20)-(SCR_W\2 + 16, 42), C_YELLOW,BF
+	end if
+	draw string (SCR_W\2 - 8, 10), str(MAX_TURN_TIMING_SECS - int(Timer - turn_timing))
 
 end sub
 
@@ -646,8 +663,108 @@ sub draw_trajectory(Ball_Record() as ball_proto, ball_record_slot as integer, ca
 	next c
 end sub
 
+sub draw_clouds(clouds() as generic_item_proto, camera as camera_proto)
+	dim c as integer	
+	for c = 0 to Ubound(clouds)
+		circle (clouds(c).x - camera.x_offset, _
+				clouds(c).y - camera.y_offset),  clouds(c).w, c_WHITE,,,0.5,F
+		circle (clouds(c).x - (c mod 3) * 3 - camera.x_offset, _
+				clouds(c).y - (c mod 3) * 5 - camera.y_offset),  clouds(c).w*2, c_WHITE,,,0.3,F
+	next c
+end sub
+
+sub check_ball_collisions	(Ball as ball_proto, Terrain_line() as terrain, _
+							pl() as player_proto)
+							
+	dim as integer t, c
+	t = get_nrst_node(ball.x, ball.y, Terrain_line())
+	'modify the ground profile when the ball impacts
+	Terrain_line(t).y += 16
+	if t < Ubound(Terrain_line) and t > 0 then
+		terrain_line(t-1).y +=8
+		terrain_line(t+1).y +=8
+	end if
+
+	'check collision of the ball with each player
+	for c = 0 to Ubound(pl)
+		'skip the players without power
+		if pl(c).is_alive = false then continue for
+		if (d_b_t_p(Ball.x, Ball.y,pl(c).x, pl(c).y) < 30) then
+			'the player hitted lose some power
+			pl(c).power -= int(60 - d_b_t_p(Ball.x, Ball.y,pl(c).x, pl(c).y))
+			if pl(c).power < 1 then pl(c).is_alive = false
+			pl(c).speed = rnd*5 + 5
+			pl(c).rds = PI/2 + rnd(PI/4) - PI/8
+			pl(c).y +=10
+		end if
+	next c
+
+end sub
+
+sub  record_ball_position	(ball_record() as ball_proto, ball as ball_proto,_
+							ball_record_slot as uinteger ptr)
+	Ball_Record(*ball_record_slot).x = ball.x
+	Ball_Record(*ball_record_slot).y = ball.y
+	*ball_record_slot +=1
+	if *ball_record_slot > Ubound (Ball_Record) then 
+		*ball_record_slot = 0
+	end if		
+end sub
+
+sub update_camera (		camera as camera_proto, ball as ball_proto, _
+						pl() as player_proto, pl_sel as integer)
+	if ball.is_active then
+		camera.speed = d_b_t_p(camera.x, camera.y, ball.x, ball.y) / 25
+		camera.x += cos(_abtp(camera.x, camera.y, ball.x, ball.y))*camera.speed 
+		camera.y += -sin(_abtp(camera.x, camera.y, ball.x, ball.y))*camera.speed 
+    else
+		camera.speed = d_b_t_p(camera.x, camera.y, pl(pl_sel).x, pl(pl_sel).y) / 25
+		camera.x += cos(_abtp(camera.x, camera.y, pl(pl_sel).x, pl(pl_sel).y))*camera.speed 
+		camera.y += -sin(_abtp(camera.x, camera.y, pl(pl_sel).x, pl(pl_sel).y))*camera.speed 
+    end if
+    
+        'padding & border limit check
+    if (camera.x < 0 + SCR_W\2) then
+        camera.x = 0 + SCR_W\2
+    end if
+    if (camera.x > TERRAIN_WIDTH - SCR_W\2) then
+        camera.x = TERRAIN_WIDTH - SCR_W\2
+    end if
+    
+    if (camera.y < -SCR_H\2 + 150) then
+        camera.y = -SCR_H\2 + 150
+    end if
+    if (camera.y > SCR_H\2) then
+        camera.y = SCR_H\2
+    end if
+    
+    camera.x_offset = camera.x - SCR_W\2
+    camera.y_offset = camera.y - SCR_H\2
 
 
+end sub
+
+sub	update_turn_change (	turn_timing as single ptr, turn as integer ptr, _
+							pl() as player_proto, pl_sel as integer ptr)
+	dim c as integer
+	if Timer - *turn_timing > MAX_TURN_TIMING_SECS then
+	*turn = 1 - *turn
+	*turn_timing = Timer
+	'find first alive player from other team
+	for c = *turn to Ubound(pl) step 2
+		if pl(c).is_alive then
+			*pl_sel = c
+			exit for
+		end if
+	next c
+	end if
+
+end sub
+
+sub draw_mouse_pointer (User_Mouse as mouse)
+	line (User_Mouse.x - 5, User_Mouse.y)- (User_Mouse.x +5, User_Mouse.y)
+	line (User_Mouse.x, User_Mouse.y +5)- (User_Mouse.x, User_Mouse.y - 5)
+end sub
 
 
 

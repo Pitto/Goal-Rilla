@@ -1,5 +1,5 @@
 #define GAME_NAME "GOALRILLA"
-#define GAME_VERSION 			"0.08"
+#define GAME_VERSION 			"0.09"
 #define SCR_W 					640	
 #define SCR_H 					480
 #define SECTIONS 				100
