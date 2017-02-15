@@ -23,32 +23,36 @@ Dim Ball 							as ball_proto
 Dim Ball_Record(0 to 24) 			as ball_proto
 dim ball_record_slot				as integer
 dim ball_sprite(0 to 4) 			as Uinteger ptr
+dim cloud_sprite(0 to 9) 			as Uinteger ptr
 dim big_numbers (0 to 9) 			as Uinteger ptr
-dim clouds(0 to 20) 				as generic_item_proto
+dim c 								as integer
+dim camera							as camera_proto
+dim clouds(0 to 29)	 				as generic_item_proto
 dim Debug_mode 						as boolean = false
+dim game_section 					as proto_game_section
+dim particles(0 to 9) 				as ball_proto
 Dim pl(0 to 19)	 					as player_proto
 dim pl_sel 							as integer = 0
 dim pl_sprite_0(0 to 31) 			as Uinteger ptr
 dim pl_sprite_1(0 to 31)			as Uinteger ptr
-Dim User_Mouse 						as mouse
-dim particles(0 to 9) 				as ball_proto
-Dim turn 							as integer = 0
-dim terrain_sprite (0 to 15) 		as Uinteger ptr
 dim status_sprite(0 to 2) 			as Uinteger ptr
-dim turn_timing						as single
+dim terrain_sprite (0 to 15) 		as Uinteger ptr
 Dim Terrain_line(0 to SECTIONS-1) 	as Terrain
-dim game_section 					as proto_game_section
-dim camera							as camera_proto
-dim c as integer
+Dim turn 							as integer = 0
+dim turn_timing						as single
+Dim User_Mouse 						as mouse
 
 DIM SHARED Workpage 				AS INTEGER
 
 'init some vars
-camera.x = 0
-camera.x_offset = 0
-camera.y = 0 
-camera.speed = 0
-camera.obj = player
+
+with camera
+	.x = 0
+	.x_offset = 0
+	.y = 0 
+	.speed = 0
+	.obj = player
+end with
 game_section = splashscreen
 ball_record_slot = 0
 ball.is_active = false
@@ -64,8 +68,9 @@ screenres SCR_W, SCR_H, 24
 SetMouse 320, 240, 0
 
 load_bmp (ball_sprite(), 80, 16, 5, 1,"img\ball_sprites.bmp")
-load_bmp (pl_sprite_0(), 84, 200, 4, 8,"img\pl_sprites_0.bmp")
-load_bmp (pl_sprite_1(), 84, 200, 4, 8,"img\pl_sprites_1.bmp")
+load_bmp (cloud_sprite(), 400, 100, 5, 2,"img\clouds.bmp")
+load_bmp (pl_sprite_0(), 84, 200, 4, 8,"img\pl_sprites_2.bmp")
+load_bmp (pl_sprite_1(), 84, 200, 4, 8,"img\pl_sprites_0.bmp")
 load_bmp (status_sprite(), 78, 32, 3, 1,"img\status_sprite.bmp")
 load_bmp (terrain_sprite(), 128, 128, 4, 4,"img\terrain.bmp")
 load_bmp (big_numbers(), 280, 32, 10, 1,"img\numbers.bmp")
@@ -153,7 +158,7 @@ DO
 			draw_ball(Ball, Ball_sprite(), camera)
 			
 			'draw clouds
-			draw_clouds(clouds(), camera)
+			draw_clouds(clouds(), cloud_sprite(), camera)
 			'draw players icons on bottom of the screen and also turn timing
 			draw_player_stats (pl(), pl_sel, turn, status_sprite(), turn_timing)
 		
@@ -190,3 +195,6 @@ for c = 0 to Ubound(terrain_sprite)
 	ImageDestroy terrain_sprite(c)
 next c
 
+for c = 0 to Ubound(cloud_sprite)
+	ImageDestroy cloud_sprite(c)
+next c

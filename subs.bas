@@ -663,13 +663,18 @@ sub draw_trajectory(Ball_Record() as ball_proto, ball_record_slot as integer, ca
 	next c
 end sub
 
-sub draw_clouds(clouds() as generic_item_proto, camera as camera_proto)
-	dim c as integer	
+sub draw_clouds(clouds() as generic_item_proto, cloud_sprite() as Uinteger ptr, camera as camera_proto)
+	dim as integer	c, d
 	for c = 0 to Ubound(clouds)
-		circle (clouds(c).x - camera.x_offset, _
-				clouds(c).y - camera.y_offset),  clouds(c).w, c_WHITE,,,0.5,F
-		circle (clouds(c).x - (c mod 3) * 3 - camera.x_offset, _
-				clouds(c).y - (c mod 3) * 5 - camera.y_offset),  clouds(c).w*2, c_WHITE,,,0.3,F
+		if c < ubound(cloud_sprite) then
+			d = c
+		else
+			d = c mod ubound(cloud_sprite)
+		end if
+		put (clouds(c).x - camera.x_offset, _
+				clouds(c).y - camera.y_offset),  cloud_sprite(d), trans
+
+				
 	next c
 end sub
 
